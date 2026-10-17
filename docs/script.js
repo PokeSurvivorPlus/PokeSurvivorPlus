@@ -13,12 +13,12 @@
     });
   }
 
-  // Install step 2: the extensions address for each browser
+  // Install step 1: what to click in each browser
   const tabs = [...document.querySelectorAll('.tabs [role="tab"]')];
-  const url = document.querySelector('.ext-url');
+  const note = document.querySelector('.browser-note');
   tabs.forEach((t) => t.addEventListener('click', () => {
     tabs.forEach((x) => x.setAttribute('aria-selected', String(x === t)));
-    if (url) url.textContent = t.dataset.url;
+    if (note) note.textContent = t.dataset.note;
   }));
 
   // Lightbox

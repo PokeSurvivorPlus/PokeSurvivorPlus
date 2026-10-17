@@ -52,10 +52,10 @@
         <h1>PokéSurvivor,<br><span class="gold">plus</span> everything<br>you wished it had.</h1>
         <p class="lede">A free browser extension for <a href="https://pokesurvivor.com/">pokesurvivor.com</a> with Endless runs, a redesigned HUD, a damage meter, a minimap, full controller support, co-op chat &amp; pings, and dozens of quality-of-life upgrades.</p>
         <div class="cta">
-          <a class="btn gold big" href="https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/releases/latest">⬇ Download v1.0</a>
+          <a class="btn gold big" href="https://chromewebstore.google.com/detail/pokesurvivor-plus/deobgjkejfjknofekpfccfbghgbhiidn">➕ Add to Chrome — it's free</a>
           <a class="btn ghost big" href="#install">How to install</a>
         </div>
-        <p class="small">For Chrome, Edge, Brave, Opera and other Chromium browsers on desktop. <span class="soon">Chrome Web Store: coming soon</span></p>
+        <p class="small">On the Chrome Web Store, for Chrome, Edge, Brave, Opera and other Chromium browsers on desktop. Prefer a zip? <a href="https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/releases/latest">Download it from GitHub</a>.</p>
       </div>
       <div class="hero-art">
         <figure class="frame tilt-a"><img src="assets/screenshots/hud-coop.jpg" width="1600" height="900" alt="A co-op run with PokeSurvivor Plus: team cards, a boss health plate, the damage meter and the minimap"></figure>
@@ -204,31 +204,34 @@
   <!-- Install -->
   <section class="install" id="install">
     <div class="wrap">
-      <h2 class="sec">Install in two minutes</h2>
-      <p class="sec-sub"><span class="soon">Chrome Web Store: coming soon.</span> Until then, load it by hand:</p>
+      <h2 class="sec">Install in one click</h2>
+      <p class="sec-sub">PokeSurvivor Plus is on the Chrome Web Store, and updates install automatically.</p>
       <ol class="steps">
         <li>
           <span class="num">1</span>
-          <h3>Download</h3>
-          <p>Get <code>pokesurvivor-plus-1.0.0.zip</code> from the <a href="https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/releases/latest">latest release</a> and extract it somewhere you'll keep it.</p>
+          <h3>Open the store page</h3>
+          <p>Go to <a href="https://chromewebstore.google.com/detail/pokesurvivor-plus/deobgjkejfjknofekpfccfbghgbhiidn">PokeSurvivor Plus on the Chrome Web Store</a>.</p>
+          <div class="tabs" role="tablist" aria-label="Browser">
+            <button role="tab" aria-selected="true" data-note="Click Add to Chrome, then Add extension.">Chrome</button>
+            <button role="tab" aria-selected="false" data-note="Click Add to Brave (or Add to Chrome), then Add extension.">Brave</button>
+            <button role="tab" aria-selected="false" data-note="First click Allow extensions from other stores in the bar Edge shows, then Get / Add to Chrome.">Edge</button>
+            <button role="tab" aria-selected="false" data-note="First install Opera's Install Chrome Extensions add-on, then click Add to Opera.">Opera</button>
+          </div>
+          <p class="browser-note">Click Add to Chrome, then Add extension.</p>
         </li>
         <li>
           <span class="num">2</span>
-          <h3>Open extensions</h3>
-          <div class="tabs" role="tablist" aria-label="Browser">
-            <button role="tab" aria-selected="true" data-url="chrome://extensions">Chrome</button>
-            <button role="tab" aria-selected="false" data-url="edge://extensions">Edge</button>
-            <button role="tab" aria-selected="false" data-url="brave://extensions">Brave</button>
-            <button role="tab" aria-selected="false" data-url="opera://extensions">Opera</button>
-          </div>
-          <p>Type <code class="ext-url">chrome://extensions</code> in the address bar and turn on <b>Developer mode</b>.</p>
+          <h3>Add it</h3>
+          <p>Confirm with <b>Add extension</b>. That's it: no developer mode, no files to keep.</p>
         </li>
         <li>
           <span class="num">3</span>
-          <h3>Load unpacked</h3>
-          <p>Click <b>Load unpacked</b>, pick the <code>pokesurvivor-plus-1.0.0</code> folder, then open <a href="https://pokesurvivor.com/">pokesurvivor.com</a>.</p>
+          <h3>Play</h3>
+          <p>Open <a href="https://pokesurvivor.com/">pokesurvivor.com</a>. You'll see the gold <b>Play</b> and purple <b>Endless</b> buttons; every option is in the game's <b>Settings</b>.</p>
         </li>
       </ol>
+      <p class="center"><a class="btn gold" href="https://chromewebstore.google.com/detail/pokesurvivor-plus/deobgjkejfjknofekpfccfbghgbhiidn">➕ Get it on the Chrome Web Store</a></p>
+      <p class="center small">Rather install it by hand? Download the zip from the <a href="https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/releases/latest">latest release</a>, then use <b>Load unpacked</b> in developer mode (don't keep both versions on at once).</p>
       <p class="center small">Updating, uninstalling and troubleshooting: <a href="https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/blob/main/INSTALL.md">full install guide</a>. Firefox, Safari and mobile browsers aren't supported yet.</p>
     </div>
   </section>
@@ -269,8 +272,12 @@
         <p>Chromium-based desktop browsers such as Chrome, Edge, Brave and Opera. Firefox, Safari and mobile browsers aren't supported yet.</p>
       </details>
       <details>
-        <summary>Why does my browser mention “developer mode”?</summary>
-        <p>Extensions loaded by hand (rather than from a store) need developer mode turned on. That's expected until PokeSurvivor Plus is on the Chrome Web Store.</p>
+        <summary>Where's the safest place to get it?</summary>
+        <p>The <a href="https://chromewebstore.google.com/detail/pokesurvivor-plus/deobgjkejfjknofekpfccfbghgbhiidn">Chrome Web Store</a> or this project's <a href="https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/releases">GitHub releases</a>. Both are published by the author; avoid copies from anywhere else.</p>
+      </details>
+      <details>
+        <summary>Does it update by itself?</summary>
+        <p>Yes, if you installed it from the Chrome Web Store. A manual (zip) install needs the new zip from GitHub; see the <a href="https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/blob/main/INSTALL.md#updating">install guide</a>.</p>
       </details>
       <details>
         <summary>Will my progress or settings be lost when I update?</summary>
