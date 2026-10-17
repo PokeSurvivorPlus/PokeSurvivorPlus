@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <title>PokeSurvivor Plus</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3461b8"/>
+      <stop offset="1" stop-color="#16295e"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff0a8"/>
+      <stop offset=".55" stop-color="#ffd23f"/>
+      <stop offset="1" stop-color="#f0a91a"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="116" height="116" rx="26" fill="#0b1838"/>
+  <rect x="11" y="11" width="106" height="106" rx="22" fill="url(#bg)" stroke="#f4f8ff" stroke-width="5"/>
+  <path d="M52 28h24v24h24v24H76v24H52V76H28V52h24z" fill="#7a4d00" transform="translate(0 4)"/>
+  <path d="M52 28h24v24h24v24H76v24H52V76H28V52h24z" fill="url(#gold)" stroke="#7a4d00" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M57 34h7v19h-7z" fill="#fff8d6" opacity=".8"/>
+  <path d="M98 18l3 8 8 3-8 3-3 8-3-8-8-3 8-3z" fill="#ffffff"/>
+</svg>

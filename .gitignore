@@ -1,0 +1,7 @@
+# Release builds (uploaded to GitHub Releases, not committed)
+dist/
+*.zip
+
+# System
+.DS_Store
+Thumbs.db

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Install help
+    url: https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/blob/main/INSTALL.md
+    about: Step-by-step installation, updating and troubleshooting.
+  - name: Privacy policy
+    url: https://pokesurvivorplus.github.io/PokeSurvivor-Plus-Privacy/
+    about: What PokeSurvivor Plus stores and sends.

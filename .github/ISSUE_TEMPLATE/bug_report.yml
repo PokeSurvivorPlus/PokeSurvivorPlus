@@ -1,0 +1,57 @@
+name: Bug report
+description: Something in PokeSurvivor Plus isn't working
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please check **Settings → Extras → Status** in the game first: it shows if a game update switched a feature off.
+        PokeSurvivor Plus is an unofficial extension: please don't report extension problems to the game's developer.
+  - type: input
+    id: version
+    attributes:
+      label: PokeSurvivor Plus version
+      description: Shown at the bottom left of the main menu.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: "Brave 1.71, Chrome 130, Edge 130…"
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Where did it happen?
+      options:
+        - Main menu / other menus
+        - Solo run
+        - Co-op run
+        - Endless run
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead? Screenshots help a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open …
+        2. Click …
+        3. See …
+  - type: textarea
+    id: console
+    attributes:
+      label: Errors (optional)
+      description: Any errors shown for PokeSurvivor Plus on your browser's extensions page, or lines starting with [psmod] in the page console (F12).
+      render: text
