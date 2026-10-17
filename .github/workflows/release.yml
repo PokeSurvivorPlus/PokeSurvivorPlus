@@ -1,10 +1,17 @@
-# Publishes a GitHub release when a version tag (v1.0.0, v1.1.0…) is pushed:
-# builds the zip from extension/ and uses release-notes/<tag>.md as the notes.
+# Publishes the GitHub release for the version in extension/manifest.json,
+# when there isn't one yet: builds the zip from extension/ and uses
+# release-notes/v<version>.md as the notes. Runs when the manifest or the
+# release notes change on main (or by hand from the Actions tab).
 name: Release
 
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths:
+      - extension/manifest.json
+      - release-notes/**
+      - .github/workflows/release.yml
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,19 +22,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check the tag matches manifest.json
+      - name: Read the version
+        id: v
         run: |
           v=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' extension/manifest.json | head -n 1)
-          if [ "v$v" != "$GITHUB_REF_NAME" ]; then echo "Tag $GITHUB_REF_NAME doesn't match manifest version $v"; exit 1; fi
+          echo "tag=v$v" >> "$GITHUB_OUTPUT"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
 
-      - name: Build the zip
-        run: sh scripts/package.sh
-
-      - name: Create the release
+      - name: Skip if this version is already released
+        id: check
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS.txt \
-            --title "PokeSurvivor Plus ${GITHUB_REF_NAME#v}" \
-            --notes-file "release-notes/${GITHUB_REF_NAME}.md" \
-            --verify-tag
+          if gh release view "${{ steps.v.outputs.tag }}" >/dev/null 2>&1; then echo "exists=yes" >> "$GITHUB_OUTPUT"; else echo "exists=no" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Build the zip
+        if: steps.check.outputs.exists == 'no'
+        run: sh scripts/package.sh
+
+      - name: Create the release
+        if: steps.check.outputs.exists == 'no'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="release-notes/${{ steps.v.outputs.tag }}.md"
+          test -f "$notes" || { echo "Missing $notes"; exit 1; }
+          gh release create "${{ steps.v.outputs.tag }}" dist/*.zip dist/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" \
+            --title "PokeSurvivor Plus ${{ steps.v.outputs.version }}" \
+            --notes-file "$notes"
