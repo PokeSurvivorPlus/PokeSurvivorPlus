@@ -1,6 +1,6 @@
 # PokeSurvivor Plus — Features
 
-Everything PokeSurvivor Plus 1.0 adds to [PokéSurvivor](https://pokesurvivor.com/). Each feature is part of the extension in [`extension/`](extension/); almost all of them can be switched off or adjusted in the game's **Settings** screen.
+Everything PokeSurvivor Plus adds to [PokéSurvivor](https://pokesurvivor.com/). Each feature is part of the extension in [`extension/`](extension/); almost all of them can be switched off or adjusted in the game's **Settings** screen.
 
 **Contents:** [Main menu](#main-menu) · [Endless runs](#endless-runs) · [Redesigned HUD](#redesigned-hud) · [Damage meter](#damage-meter-and-upgrades-panel) · [Minimap](#minimap) · [Co-op](#co-op) · [Controller](#controller-support) · [Pokémon screen](#pokémon-screen) · [Stats & share cards](#stats-runs-and-share-cards) · [Upgrades & gacha](#upgrades-and-gacha) · [Settings](#settings) · [Accessibility](#accessibility-and-display) · [Audio & music](#audio-and-music) · [Notifications](#notifications) · [Quality of life](#quality-of-life) · [Keyboard shortcuts](#keyboard-shortcuts) · [Limitations](#notes-and-limitations)
 
@@ -18,7 +18,7 @@ Everything PokeSurvivor Plus 1.0 adds to [PokéSurvivor](https://pokesurvivor.co
 - **Room on the main menu (co-op):** while you're in a room, the party, the room's status, its chat and Invite / Leave room sit under your partner. **Play** starts the co-op run for everyone (host), says who you're waiting for (guest), or plays solo if you're alone.
 - **Party strip:** in a group, a strip under your partner shows every member, the Pokémon they picked and its upgrade level (★ host, ✦ shiny).
 - A different **splash text** (over a hundred) pulses under the logo each time you come back, and the Pokémon wandering behind the menu are sometimes shiny (about 1 in 64).
-- The version (“PokeSurvivor Plus v1.0.0”) sits at the bottom left; click it for what's new. A **Now playing** card slides in at the bottom right when a new song starts.
+- The version (“PokeSurvivor Plus v1.4”) sits at the bottom left; click it for what's new. A **Now playing** card slides in at the bottom right when a new song starts.
 - The menu scales down to fit short windows.
 
 ## Endless runs
@@ -92,9 +92,16 @@ Bosses, legendaries, shinies, rifts, events and teammates stay pinned to the map
 - **Pause for everyone:** the host can pause the whole game (enemies, timer and spawns stop for every player, even those without the extension). Anyone with PokeSurvivor Plus can vote to pause or resume; it happens once half the players vote. The host needs PokeSurvivor Plus.
 - **Spectate while down:** the camera follows a teammate while you wait to be revived (switch with Q / E, the wheel or LB / RB), with an arrow back to where you fell. With the host on PokeSurvivor Plus you also see the enemies around them.
 - **Fewer disconnects:** if the connection between players drops, the extension waits up to 30 seconds for it to come back instead of removing the player straight away (the host retries after 15 seconds). It also stops Chrome from discarding the game tab to save memory. `Alt` + `L` opens a connection log.
+- **Rooms of up to 8 players:** Settings → Extras → Co-op (on by default). The host and players 5–8 need PokeSurvivor Plus 1.2 or later. Players 5–8 get four new colours; enemies keep scaling with each player past 4, more gently than from 1 to 4. Runs of 5–8 never go on the leaderboard and leave your best times as they were. Teammate cards shrink to one line each.
+- **Create room and room codes:** **Friends → Create room** makes a room with a short 6-digit code (e.g. `482 913`). **Room code** on the room panel shows the code (with Copy code / Copy link) for any room; anyone with PokeSurvivor Plus and a game account can join with it from **Friends → Room code or link**, or by opening a `pokesurvivor.com/#join=…` link (it asks first). It warns once that players connect directly, so they can see each other's IP address. Rooms made by inviting someone keep the game's long, unguessable code.
+- **Friends list:** each friend's status (online, in a lobby, in a solo or co-op run) and a **Join** button for a friend's lobby. **Anyone in a room can invite friends**, not only the host.
+- **Running the room:** the host can **Kick** a player (it asks “Sure?”); kicked players stay out of that room. A full room says so before anyone tries to join. Your card updates as soon as you pick a new partner.
+- **Playing together:** change your level-up card until everyone has chosen; everyone picks their bond at the same time after a rift; big chests open and revives go faster with more players on them (up to 3×). After a rift, bosses can't spawn back in the arena.
 - Works best when everyone — especially the host — has PokeSurvivor Plus.
 
 ![Chat bubbles in co-op](docs/assets/screenshots/coop-chat.jpg)
+
+![An 8-player room with a short room code](docs/assets/screenshots/rooms.jpg)
 
 ## Controller support
 
@@ -150,6 +157,7 @@ If nothing happens, press any button once: browsers only report a controller aft
 ![Gacha screen](docs/assets/screenshots/gacha.jpg)
 
 - **Max all upgrades:** one button buys every missing upgrade level for the selected Pokémon (click twice to confirm), cheapest first if your coins don't cover them all. The total upgrade level (out of 90) is shown beside it.
+- **Move details:** hover any move (shortcuts, move list, ban list, level-up cards) to see what it does; upgrade cards show what changes. Upgrades always opens on your partner.
 - **Move shortcuts:** each opens a list of the Pokémon's moves with their type icons. Tighter upgrade cards, with Ban's button inside its card.
 - **Repertoire option:** “Start with one move even if Repertoire is owned” (coins aren't refunded; toggle any time).
 - **Gacha:** **Skip animation**, **Always skip**, and **Use all** to spend every ticket on a banner at once (×10 tickets first, then regular tickets in tens, keeping the guaranteed epic per ten). Each button says what it does and costs.
@@ -174,7 +182,9 @@ The extension's options live inside the game's own Settings screen (also from th
 
 ![Accessibility settings](docs/assets/screenshots/accessibility.jpg)
 
-- **Colour blind mode:** a screen colour correction for protanopia (red), deuteranopia (green) or tritanopia (blue), tuned on the game's own colours so pairs like health red / heal green, Fire / Grass and Electric / Bug end up 3–5× further apart. Strength from 20% to 160%.
+- **Colour blind mode:** a screen colour correction for protanopia (red), deuteranopia (green) or tritanopia (blue), tuned on the game's own colours so pairs like health red / heal green, Fire / Grass and Electric / Bug end up 3–5× further apart. Strength from 20% to 160%, applied to the UI only or to the UI and the Pokémon / scene.
+- **Spanish:** with the game in Español, PokeSurvivor Plus's menus, settings, panels, tooltips and messages are in Spanish too.
+- **Low health glow:** a red vignette around the screen under 20% health (Settings → HUD & UI). Shiny Pokémon twinkle now and then.
 - **Less shake and flashes** (the game's setting) and **fewer PokeSurvivor Plus animations**.
 - **Wider field of view:** zoom the camera out (1.0×–1.7×, default 1.4×).
 - **Attack effects:** opacity and size (down to 20%) for your attacks and, separately, your teammates'. Only the look changes; hit areas stay the same.

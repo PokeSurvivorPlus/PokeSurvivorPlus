@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PokeSurvivor Plus",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "description": "PokeSurvivor Plus: redesigned HUD, damage meter, minimap, controller support, alerts, quality-of-life tools and more!",
   "background": {
     "service_worker": "background.js"

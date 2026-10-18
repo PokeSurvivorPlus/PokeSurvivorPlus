@@ -12,7 +12,8 @@
   window.__psmod = true;
 
   const LS = 'psmod:';
-  const PLUS_VERSION = '1.0.0';   // keep in step with manifest.json
+  const PLUS_VERSION = '1.4.0';   // keep in step with manifest.json
+  const PLUS_LABEL = '1.4';   // shown in the menu
   const load = (k, d) => { try { const v = localStorage.getItem(LS + k); return v == null ? d : JSON.parse(v); } catch { return d; } };
   const save = (k, v) => { try { localStorage.setItem(LS + k, JSON.stringify(v)); } catch {} };
 
@@ -54,6 +55,7 @@
   // that one feature is switched off, the game carries on as without the
   // extension, and a notice points to Settings → Extras → Status.
   const FEATURE_LABEL = {
+    setupBigRooms: 'Rooms of up to 8 players', powerToast: 'Altar power message', lvlTips: 'Level-up card details', netPace: 'Co-op connection pacing', riftSafety: 'Bosses after rifts', friendsRooms: 'Friends and rooms', roomCode: 'Room codes', plusEs: 'Spanish', cbHud: 'Colour blind HUD layer', menuShinies: 'Shinies behind the menu', spriteMeta: 'Sprite data', topbar: 'Top bar', partnerSync: 'Partner in Upgrades and the room', runExtras: 'Twinkles, low health glow, faster co-op chests and revives', repick: 'Change your level-up card in co-op',
     setupVersionTag: 'Version on the menu', endless: 'Endless mode', setupEndless: 'Endless mode',
     setupUpgLayout: 'Upgrades layout and move shortcuts',
     setupSettingsSearch: 'Settings search', settingsSearch: 'Settings search', setupAchSearch: 'Achievement search', achSearch: 'Achievement search',
@@ -596,8 +598,18 @@
     let cardsBottom = 0;
     if (team) {
       let y = 10;
+      // Rooms of 5-8: smaller cards so the column stays short.
+      const live = NS.Coop.mates.filter((m) => m.connected && m.pl);
+      const compact = live.length > 3;
+      // The damage panel would cover the longer column: sit beside it.
+      let cx = 0;
+      if (compact && panel && !panel.classList.contains('psmod-hidden')) {
+        const r = panel.getBoundingClientRect(), k = hudHitK || 1;
+        if (r.width && r.left < 210 * k && r.top < (10 + live.length * 30) * k) cx = Math.ceil(r.right / k) + 6;
+      }
       for (const m of NS.Coop.mates) {
         if (!m.connected || !m.pl) continue;
+        if (compact) { y = drawMiniCard(ctx, m, cx, y, t, rows, hits); continue; }
         const o = m.pl, net = o.net || {};
         const dead = !!(net.dead || o.dead);
         const hp = net.hp != null ? net.hp : o.hp, max = net.maxHp || o.maxHp || 1;
@@ -664,10 +676,14 @@
     for (const [key, label, fg, bg] of BOOST) {
       const b = pl.buffs && pl.buffs[key];
       if (!b || !(b.n > 0)) continue;
-      cx += pill(ctx, cx, hpY - 16, `${label} ${b.n}x`, '#fff', bg, fg) + 4;
+      const bw = pill(ctx, cx, hpY - 16, `${label} ${b.n}x`, '#fff', bg, fg);
+      hits.push({ x: cx, y: hpY - 16, w: bw, h: 13, kind: 'boost', stat: key });
+      cx += bw + 4;
     }
     if (pl.power && pl.power.def) {
-      cx += pill(ctx, cx, hpY - 16, `${String(tr(pl.power.def.name)).toUpperCase()} ${Math.ceil(pl.power.t)}s`, pl.power.def.color || '#fff') + 4;
+      const pw = pill(ctx, cx, hpY - 16, `${powerName(pl.power.def).toUpperCase()} ${Math.ceil(pl.power.t)}s`, pl.power.def.color || '#fff');
+      hits.push({ x: cx, y: hpY - 16, w: pw, h: 13, kind: 'power' });
+      cx += pw + 4;
     }
 
     // Active move's name, right end of the same line.
@@ -1150,6 +1166,34 @@
     return y + h + 6;
   }
   let arenaTotal = 0;
+  // One line per teammate (rooms of 5-8 players): portrait, name, health.
+  function drawMiniCard(ctx, m, x0, y, t, rows, hits) {
+    const Icons = NS.Icons;
+    const o = m.pl, net = o.net || {};
+    const dead = !!(net.dead || o.dead);
+    const hp = net.hp != null ? net.hp : o.hp, max = net.maxHp || o.maxHp || 1;
+    const mon = o.mon || {};
+    const emo = emotionFor('mate:' + m.uid, mon.dex, o.shiny, hp, dead, max);
+    drawPortrait(ctx, x0 + 10, y, 24, mon.dex, o.shiny, m.color, mon.name, emo, dead);
+    ctx.font = HF(800, 10);
+    ctx.textAlign = 'left';
+    outlined(ctx, m.name, x0 + 40, y + 9, m.color);
+    if (dead) {
+      const nx = x0 + 40 + Math.ceil(ctx.measureText(m.name).width) + 6;
+      ctx.font = HF(800, 9);
+      outlined(ctx, 'DOWN', nx, y + 9, Math.sin(t * 8) > 0 ? '#ff8a96' : '#fff');
+    }
+    const mh = Math.max(3, Math.round(5 * barK('hpSize')));
+    bar(ctx, x0 + 40, y + 18 - mh / 2, 132, mh, dead ? 0 : hp / max, hpColor(barSet.mate, hp / max, m.color), 'rgba(60,12,20,.9)');
+    const mi = (rows.get(m.uid) || {}).item;
+    if (mi && Icons) {
+      frame(ctx, x0 + 178, y + 2, 20, 20, 4, 'rgba(40,30,10,.92)', '#ffd23f', 1.5);
+      Icons.draw(ctx, mi, x0 + 180, y + 4, 16);
+      hits.push({ x: x0 + 178, y: y + 2, w: 20, h: 20, kind: 'mateItem', item: mi });
+    }
+    return y + 30;
+  }
+
   function drawRiftArrow(ctx, W, H, pl, cardsBottom, t, r) {
     if (!notif.rift) return;
     const cam = NS.Camera;
@@ -1502,6 +1546,22 @@
       ${m.desc || (m.def && m.def.desc) ? `<div class="ds">${esc(tr(m.desc || m.def.desc))}</div>` : ''}
       <div class="st">${rows.join('')}</div>${next}`;
   }
+  // Altar powers, in English (the game's dictionary turns “Rayo” into Thunderbolt).
+  const POWER_EN = { dmg: ['Fury', 'Your damage is doubled.'], spd: ['Swift', 'You move 45% faster.'], mag: ['Magnet', 'Your magnet reaches 4× as far: you pull in everything from afar.'], cd: ['Haste', 'Your moves recharge 40% faster.'] };
+  const powerName = (d) => (POWER_EN[d.id] || [])[0] || String(tr(d.name));
+  const powerDesc = (d) => (POWER_EN[d.id] || [])[1] || cap(tr(d.desc));
+  function powerTip(pw) {
+    const d = pw.def;
+    return `<div class="hd"><b style="color:${esc(d.color || '#fff')}">${esc(powerName(d))} power</b><span class="lv">${Math.ceil(pw.t)} s left</span></div><div class="ds" style="margin:3px 0 0">${esc(powerDesc(d))}</div><div class="nx">From an altar · lasts ${Math.round(pw.dur || 25)} s</div>`;
+  }
+  const BOOST_TIP = { atk: ['Attack boost', 'More damage', '#ff8a96'], def: ['Defence boost', 'Less damage taken', '#9cc4ff'], spd: ['Speed boost', 'Faster movement', '#e2e8f4'], regen: ['Regeneration', 'Health back over time', '#7dffa6'] };
+  function boostTip(pl, k) {
+    const b = pl.buffs && pl.buffs[k], t = BOOST_TIP[k];
+    if (!b || !t || !(b.n > 0)) return '';
+    const per = b.amount != null ? (k === 'regen' ? `+${(+b.amount).toFixed(1)} health/s` : `+${Math.round(b.amount * 100)}%`) : '';
+    const tot = b.amount != null ? (k === 'regen' ? `+${(b.amount * b.n).toFixed(1)} health/s` : `+${Math.round(b.amount * b.n * 100)}%`) : '';
+    return `<div class="hd"><b style="color:${t[2]}">${t[0]} ×${b.n}</b><span class="lv">${Math.max(0, Math.ceil(b.t || 0))} s left</span></div><div class="ds" style="margin:3px 0 0">${t[1]} from your boost moves.</div><div class="st">${per ? `<div class="kv"><span>Each stack</span><b>${per}</b></div><div class="kv"><span>Now</span><b>${tot}</b></div>` : ''}</div>`;
+  }
   function itemTip(id) {
     const d = NS.Items && NS.Items.BY && NS.Items.BY[id];
     if (!d) return '';
@@ -1531,7 +1591,7 @@
   function setupTips() {
     const st = document.createElement('style');
     st.textContent = `
-#psmod-tip,#psmod-mtip{position:fixed;z-index:100002;pointer-events:none;width:max-content;max-width:250px;padding:7px 9px 8px;font:12px/1.3 var(--font,'Pixelify',system-ui,sans-serif);color:#fff;
+#psmod-tip,#psmod-mtip{position:fixed;z-index:100004;pointer-events:none;width:max-content;max-width:250px;padding:7px 9px 8px;font:12px/1.3 var(--font,'Pixelify',system-ui,sans-serif);color:#fff;
   background:linear-gradient(#2c519f,#1a3170);border:2px solid #f4f8ff;outline:2px solid #0b1838;border-radius:8px;box-shadow:inset 0 0 0 2px #5b83d6,0 4px 0 #0a1430;text-shadow:1px 1px 0 #0a1430}
 :is(#psmod-tip,#psmod-mtip)[hidden]{display:none}
 :is(#psmod-tip,#psmod-mtip) .hd{display:flex;gap:10px;align-items:baseline;justify-content:space-between}
@@ -1563,11 +1623,15 @@
       const grp = hit.kind === 'move' ? pl.slots[hit.slot] || [] : null;
       const item = hit.kind === 'mateItem' ? hit.item : pl.item;
       const wx = hit.kind === 'weather' && NS.Weather && NS.Weather.current;
+      const pw = hit.kind === 'power' && pl.power && pl.power.def ? pl.power : null;
+      const bs = hit.kind === 'boost' ? pl.buffs && pl.buffs[hit.stat] : null;
       const key = hit.kind === 'move' ? 'm' + hit.slot + ':' + grp.map((m) => m.id + m.lvl + (m.evolved ? 'e' : '')).join(',')
+        : pw ? 'p' + pw.def.id + Math.ceil(pw.t) : bs ? 'b' + hit.stat + bs.n + Math.ceil(bs.t || 0)
         : wx ? 'w' + wx.kind + Math.ceil(wx.left || 0) : 'i' + item;
       if (key !== lastKey) {
         lastKey = key;
-        tipEl.innerHTML = hit.kind === 'move' ? grp.map((m) => moveTip(m, pl)).join('<hr>') : wx ? weatherTip(wx, pl) : itemTip(item);
+        tipEl.innerHTML = hit.kind === 'move' ? grp.map((m) => moveTip(m, pl)).join('<hr>') : pw ? powerTip(pw) : hit.kind === 'boost' ? boostTip(pl, hit.stat)
+          : hit.kind === 'power' ? '' : wx ? weatherTip(wx, pl) : itemTip(item);
       }
       if (!tipEl.innerHTML) return hide();
       tipEl.hidden = false;
@@ -1592,6 +1656,11 @@
     const st = document.createElement('style');
     st.id = 'psmod-lvl-css';
     st.textContent = `
+#scr-bond .box{width:fit-content;max-width:min(460px,calc(100vw - 20px));box-sizing:border-box}
+#scr-bond .bond-hint,#scr-bond #bond-sub{max-width:400px;margin-left:auto;margin-right:auto;text-wrap:balance}
+#scr-bond #bond-cards{width:auto;min-width:min(340px,100%)}
+#scr-bond .card{box-sizing:border-box}
+@media (max-height:520px){#scr-bond .box{max-width:min(680px,calc(100vw - 20px))}#scr-bond #bond-cards{width:auto}}
 #scr-levelup .box{width:min(640px,calc(100vw - 20px));box-sizing:border-box}
 #scr-levelup .cards{width:100%;min-height:calc(var(--psm-card,86px) * 3 + 20px)}
 #scr-levelup .card{height:var(--psm-card,86px);box-sizing:border-box;overflow:hidden;flex:0 0 auto}
@@ -1711,7 +1780,222 @@
       }
       return out;
     };
+    // Bonds: stay on the slot you had (if it was one of the moves bonded,
+    // you're on the bond, which now holds it).
+    const fuse = P.fuse;
+    if (fuse && !fuse.__psm) {
+      P.fuse = function () {
+        const was = this.slots && this.slots[this.active];
+        const out = fuse.apply(this, arguments);
+        if (was && this === me() && this.slots[this.active] !== was) {
+          const i = this.slots.indexOf(was);
+          if (i >= 0) { this.active = i; try { NS.Projectiles.clearOrbs(this); } catch {} }
+        }
+        return out;
+      };
+      P.fuse.__psm = true;
+    }
   }
+
+  // Rifts in co-op: when the arena ends, a teammate's game can still be in
+  // the arena for a moment (their countdown ends a little later), and a boss
+  // that was due spawns next to a random player: it could spawn by them, in
+  // the arena, thousands of metres from everyone. So the host waits until
+  // nobody is left in the arena, and a boss that ends up that far away anyway
+  // is brought back near the team.
+  waitFor(() => NS && NS.Spawner && NS.Spawner.update && NS.Rift && NS.EnemyMgr && NS.EnemyMgr.all, function setupRiftSafety() {
+    const Sp = NS.Spawner, upd = Sp.update;
+    if (upd.__psm) return;
+    let last = null, rescueT = 0;
+    const FAR = 15000;   // px: well past any map distance, well short of the arena's
+    const ts = () => ((NS.Tiles && NS.Tiles.T) || 16) * ((NS.Sprites && NS.Sprites.PX) || 2);
+    Sp.update = function (dt, who) {
+      try {
+        const A = NS.Rift.arena;
+        if (A) last = { x: A.x, y: A.y, r: (A.r + 6) * ts(), wait: 10 };
+        else if (last) {
+          const ps = Array.isArray(who) ? who : [who];
+          // Someone's still in there (at most 10 s: a lost connection doesn't hold it forever).
+          if ((last.wait -= dt) > 0 && ps.some((p) => p && Math.hypot(p.x - last.x, p.y - last.y) < last.r)) return;
+          last = null;
+        }
+        rescueT -= dt;
+        if (!A && rescueT <= 0) {
+          rescueT = 2;
+          const ps = (Array.isArray(who) ? who : [who]).filter((p) => p && !p.dead);
+          if (ps.length) for (const e of NS.EnemyMgr.all()) {
+            if (!e.boss || e.dead || e.remote) continue;
+            if (ps.some((p) => Math.hypot(p.x - e.x, p.y - e.y) < FAR)) continue;
+            const p = ps[Math.floor(Math.random() * ps.length)], a = Math.random() * Math.PI * 2;
+            const d = ((NS.Camera && NS.Camera.outerRadius && NS.Camera.outerRadius()) || 700) + 40;
+            e.x = p.x + Math.cos(a) * d; e.y = p.y + Math.sin(a) * d * 0.9;
+            console.info('[psmod] brought back a stranded boss:', e.name);
+          }
+        }
+      } catch (err) { trip('riftSafety', err); }
+      return upd.apply(this, arguments);
+    };
+    Sp.update.__psm = true;
+  }, 'riftSafety');
+
+  // ------------------------------------------------ during a run (1.4)
+  //  - Shiny Pokémon (yours and teammates') twinkle now and then.
+  //  - A soft red glow around the screen under 20% health.
+  //  - Co-op: opening a big chest and reviving go faster with more players
+  //    on it (up to 3× with three or more).
+  //  - Co-op: after a rift, everyone picks their bond at the same time (the
+  //    arena's goodbye countdown stopped while someone else was choosing,
+  //    so bonds came one at a time).
+  //  - Co-op level-up: your pick can be changed until everyone has chosen.
+  let lowHpOn = load('lowHp', true);
+  waitFor(() => NS && NS.Game && NS.Game.everyone && NS.FX && NS.FX.twinkle && NS.Rift && NS.Coop && document.body, function setupRunExtras() {
+    const st = document.createElement('style');
+    st.textContent = `
+#psmod-lowhp{position:fixed;inset:0;pointer-events:none;z-index:3;opacity:0;transition:opacity .9s ease;
+  box-shadow:inset 0 0 22vmin 5vmin rgba(205,15,35,.62),inset 0 0 6vmin 1vmin rgba(160,5,25,.55)}
+#psmod-lowhp.on{animation:psmLowHp 1.6s ease-in-out infinite}
+@keyframes psmLowHp{0%,100%{filter:brightness(.85)}50%{filter:brightness(1.25)}}
+html.psmod-calm #psmod-lowhp.on{animation:none}`;
+    document.head.appendChild(st);
+    const glow = document.createElement('div');
+    glow.id = 'psmod-lowhp';
+    document.body.appendChild(glow);
+    let last = performance.now();
+    const twNext = new WeakMap();
+    const IN_RUN = new Set(['playing', 'held', 'levelup', 'choice']);
+    const loop = (now) => {
+      requestAnimationFrame(loop);
+      const dt = Math.min(0.1, Math.max(0, (now - last) / 1000)); last = now;
+      const G2 = NS.Game, state = G2 && G2.state, pl = me();
+      try {
+        // Low health glow.
+        let o = 0;
+        if (lowHpOn && pl && IN_RUN.has(state) && !pl.dead && pl.maxHp > 0) {
+          const f = pl.hp / pl.maxHp;
+          if (f < 0.2) o = 0.75 + 0.25 * (1 - Math.max(0, f) / 0.2);
+        }
+        const os = o ? o.toFixed(2) : '0';
+        if (glow.style.opacity !== os) glow.style.opacity = os;
+        glow.classList.toggle('on', o > 0);
+        if (!pl || state !== 'playing') { runHeld(state, pl, dt); return; }
+        // Shiny twinkles, every few seconds.
+        const tnow = now / 1000;
+        for (const p of G2.everyone() || []) {
+          if (!p || !p.shiny || p.dead) continue;
+          let nx = twNext.get(p);
+          if (nx === undefined) { nx = tnow + 1 + Math.random() * 2; twNext.set(p, nx); }
+          if (tnow < nx) continue;
+          twNext.set(p, tnow + 2.6 + Math.random() * 2.4);
+          const r = p.r || 14, bh = p.bodyH || 30;
+          for (let i = 0; i < 3; i++) setTimeout(() => { try { if (NS.Game.state === 'playing') NS.FX.twinkle(p.x + (Math.random() * 2 - 1) * r * 1.2, p.y - (4 + Math.random() * bh)); } catch (_) { /* fine */ } }, i * 170);
+        }
+        if (!(NS.Coop && NS.Coop.active)) return;
+        const mates = (NS.Coop.puppets ? NS.Coop.puppets() : []).filter((q) => q && !q.dead);
+        // Reviving: the game adds time for one helper; more helpers add more.
+        if (pl.dead) {
+          const n = mates.filter((q) => (q.x - pl.x) ** 2 + (q.y - pl.y) ** 2 < 56 * 56).length;
+          if (n >= 2) pl.reviveT = (pl.reviveT || 0) + dt * (Math.min(3, n) - 1);
+          return;
+        }
+        // Big chests: same.
+        if (NS.World && NS.World.specialsNear) {
+          for (const c of NS.World.specialsNear(pl.x, pl.y, 200) || []) {
+            if (c.type !== 'bigchest' || !(c.open > 0)) continue;
+            const near = (q) => (q.x - c.x) ** 2 + (q.y - c.y) ** 2 < Math.max(46, (c.r || 0) + (q.r || 14) + 24) ** 2;
+            if (!near(pl)) continue;
+            const n = 1 + mates.filter(near).length;
+            if (n >= 2) c.open += dt * (Math.min(3, n) - 1);
+          }
+        }
+      } catch (err) { trip('runExtras', err); }
+    };
+    // While the run is held (someone is picking a bond), the rift arena's
+    // goodbye countdown still runs, so everyone comes back and picks too.
+    function runHeld(state, pl, dt) {
+      try {
+        const A = NS.Rift.arena;
+        if (state === 'held' && pl && A && A.phase && A.phase !== 'fight') NS.Rift.update(dt, pl, (NS.Game.st && NS.Game.st.time) || 0);
+      } catch (err) { trip('runExtras', err); }
+    }
+    requestAnimationFrame(loop);
+  }, 'runExtras');
+
+  // Co-op level-up: change your card until everyone has chosen. The game
+  // applies a card the moment you pick it; here it's kept until the cards
+  // close for everyone, and applied then.
+  waitFor(() => NS && NS.RunUI && NS.RunUI.showLevelUp && NS.RunUI.closeLevelUp && NS.RunUI.pick && NS.Coop && NS.Coop.localPicked && document.getElementById('cards'), function setupRepick() {
+    const R = NS.RunUI, box = document.getElementById('cards');
+    const st = document.createElement('style');
+    st.textContent = `
+#cards.psm-repick .card{pointer-events:auto;opacity:.55}
+#cards.psm-repick .card.picked{opacity:1;border-color:var(--gold,#ffd23f)}
+#psmod-repick-note{margin:6px 0 0;font-size:12px;color:var(--muted,#b9cbf0)}`;
+    document.head.appendChild(st);
+    let pend = null;   // { list, card, cb }
+    const note = document.createElement('p');
+    note.id = 'psmod-repick-note'; note.hidden = true; note.textContent = 'You can change your card until everyone has chosen.';
+    box.after(note);
+    const mark = () => {
+      if (!pend) return;
+      box.classList.remove('done');
+      box.classList.add('psm-repick');
+      const i = pend.list.indexOf(pend.card);
+      box.querySelectorAll(':scope > .card').forEach((el, j) => el.classList.toggle('picked', j === i));
+      note.hidden = false;
+    };
+    const clear = () => { pend = null; box.classList.remove('psm-repick'); note.hidden = true; };
+    const choose = (i) => {
+      if (!pend || !pend.list[i] || pend.list[i] === pend.card) return;
+      pend.card = pend.list[i];
+      try { NS.Audio.sfx('select'); } catch (_) { /* quiet */ }
+      mark();
+    };
+    const show = R.showLevelUp;
+    R.showLevelUp = function (level, list, cb, coop) {
+      clear();
+      if (!coop || typeof cb !== 'function' || !Array.isArray(list)) return show.apply(this, arguments);
+      const later = (card) => {
+        pend = { list, card, cb };
+        try { NS.Audio.sfx('confirm'); } catch (_) { /* quiet */ }
+        mark();
+        NS.Coop.localPicked();     // the others see you've chosen (and the host may close the cards now)
+        if (pend) setTimeout(mark, 0);
+      };
+      return show.call(this, level, list, later, coop);
+    };
+    const close = R.closeLevelUp;
+    R.closeLevelUp = function () {
+      const p = pend;
+      clear();
+      if (p) {
+        // Applied now (quietly: the confirm sound already played).
+        const sfx = NS.Audio && NS.Audio.sfx;
+        if (sfx) NS.Audio.sfx = () => {};
+        try { p.cb(p.card); } catch (err) { trip('repick', err); } finally { if (sfx) NS.Audio.sfx = sfx; }
+      }
+      return close.apply(this, arguments);
+    };
+    const pick = R.pick;
+    R.pick = function (i) { if (pend) { choose(i); return; } return pick.apply(this, arguments); };
+    box.addEventListener('click', (e) => {
+      if (!pend) return;
+      const c = e.target.closest('.card'); if (!c || c.parentElement !== box) return;
+      e.stopImmediatePropagation(); e.preventDefault();
+      choose([...box.querySelectorAll(':scope > .card')].indexOf(c));
+    }, true);
+  }, 'repick');
+
+  // Altar powers: say what you got (the game's line is a banner, off by default).
+  waitFor(() => NS && NS.Player && NS.Player.prototype && NS.Player.prototype.addPower, function setupPowerToast() {
+    const P = NS.Player.prototype, add = P.addPower;
+    if (add.__psm) return;
+    P.addPower = function (def, dur) {
+      const out = add.apply(this, arguments);
+      try { if (def && this === me()) toast(`${powerName(def)} power · ${Math.round(dur || 25)} s`, def.color || '#fff', powerDesc(def)); } catch (err) { trip('powerToast', err); }
+      return out;
+    };
+    P.addPower.__psm = true;
+  }, 'powerToast');
 
   // Fused slots show up to four small icons and no levels. Same layout as
   // the game's slot bar (54 px slots, 9 px apart, 18 px from the bottom, the
@@ -3003,7 +3287,7 @@ tr.run:hover .psm-del,.psm-del:focus-visible,.psm-del.psmod-padfocus{opacity:1}
 /* Play: the big gold button. */
 /* Every menu option its own button. */
 #scr-menu .menu-right .box:has(> .menu-list){background:none!important;border:0!important;box-shadow:none!important;padding:6px!important;margin:-6px!important;overflow:visible!important}
-#scr-menu .menu-list{gap:8px}
+#scr-menu .menu-list{gap:12px}
 #scr-menu .menu-list .menu-item{border-radius:12px;padding:8px 14px 8px 30px;background:linear-gradient(180deg,var(--box1,#2c519f),var(--box2,#1a3170));
   border:3px solid var(--edge,#f4f8ff);box-shadow:0 0 0 3px var(--edge-out,#0b1838),inset 0 0 0 2px var(--edge-in,#5b83d6),0 4px 0 var(--edge-out,#0b1838);transition:transform .08s,filter .15s}
 #scr-menu .menu-list .menu-item:hover,#scr-menu .menu-list .menu-item.psmod-padfocus{filter:brightness(1.15)}
@@ -3255,6 +3539,8 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
       // Pokémon screen: the partner button without "(shiny)" missed the
       // game's '{x}' pattern and came out as "Choose de partner".
       'Elegir de compañero': 'Choose as partner',
+      // Tooltips the game's dictionary misses (friend names, shiny badge).
+      'Ver su perfil': 'View profile', 'Tienes su shiny': 'You have its shiny', 'veces reportada': 'times reported',
       // Paradox Pokémon: the game only has their Spanish names.
       'Colmilargo': 'Great Tusk', 'Colagrito': 'Scream Tail', 'Furioseta': 'Brute Bonnet', 'Melenaleteo': 'Flutter Mane',
       'Reptalada': 'Slither Wing', 'Pelarena': 'Sandy Shocks', 'Ferrodada': 'Iron Treads', 'Ferrosaco': 'Iron Bundle',
@@ -3385,6 +3671,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
   // filling the rest of the last row. The shortcut pickers show each move's
   // type icon (a list of our own drives the game's hidden <select>).
   function setupUpgLayout() {
+    setupMoveTips();
     const list = document.getElementById('upg-list');
     if (!list || list.dataset.psmodLayout) return;
     list.dataset.psmodLayout = '1';
@@ -3410,6 +3697,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
 #psmod-mvpop{position:fixed;z-index:100002;min-width:220px;max-height:min(360px,60vh);overflow:auto;padding:6px;border-radius:12px;box-sizing:border-box;
   background:linear-gradient(180deg,var(--box1,#2c519f),var(--box2,#1a3170));border:3px solid var(--edge,#f4f8ff);box-shadow:0 0 0 3px var(--edge-out,#0b1838),0 10px 24px rgba(0,0,0,.5)}
 #psmod-mvpop[hidden]{display:none}
+.psm-mvhint{color:var(--gold,#ffd23f)}
 #psmod-mvpop button{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border:0;border-radius:8px;background:none;color:#fff;font:inherit;font-size:14px;text-align:left;cursor:pointer;text-shadow:1px 1px 0 #0a1430}
 #psmod-mvpop button:hover,#psmod-mvpop button.psmod-padfocus{background:rgba(255,255,255,.12)}
 #psmod-mvpop button.on{background:rgba(255,210,63,.18);color:var(--gold,#ffd23f)}
@@ -3448,7 +3736,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
         const v = o.value, on = v === sel.value;
         if (!v) return `<button data-v="" class="${on ? 'on' : ''}" data-sfx="none"><span style="width:18px;text-align:center">–</span>${esc(tr('Libre'))}</button>`;
         const t = typeOf(v), col = (NS.U && NS.U.TYPE_COLOR && NS.U.TYPE_COLOR[t]) || '#777';
-        return `<button data-v="${esc(v)}" class="${on ? 'on' : ''}" data-sfx="none">${icon(v, 22)}<span>${esc(moveName(v))}</span>${used.has(v) ? `<span class="used">slot ${used.get(v)}</span>` : ''}<span class="t" style="background:${col}">${esc(cap(tr(t || '')))}</span></button>`;
+        return `<button data-v="${esc(v)}" data-psm-mv="${esc(v)}" class="${on ? 'on' : ''}" data-sfx="none">${icon(v, 22)}<span>${esc(moveName(v))}</span>${used.has(v) ? `<span class="used">slot ${used.get(v)}</span>` : ''}<span class="t" style="background:${col}">${esc(cap(tr(t || '')))}</span></button>`;
       }).join('');
       popFor = btn;
       pop.hidden = false;
@@ -3489,8 +3777,13 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
         }
         const v = sel.value;
         btn.innerHTML = v ? `${icon(v)}<span class="n">${esc(moveName(v))}</span>` : `<span class="n free">${esc(tr('Libre'))}</span>`;
-        btn.title = v ? moveName(v) + ' · ' + cap(tr(typeOf(v) || '')) : '';
+        btn.title = '';
+        if (v) btn.dataset.psmMv = v; else delete btn.dataset.psmMv;
       }
+      // Ban list: hover (or the controller cursor) shows what each move does.
+      for (const b of list.querySelectorAll('.ban-picker [data-id]')) b.dataset.psmMv = b.dataset.id;
+      const bp = list.querySelector('.ban-picker > p.sub');
+      if (bp && !bp.querySelector('.psm-mvhint')) bp.insertAdjacentHTML('beforeend', ' <span class="psm-mvhint">Hover a move to see what it does.</span>');
     }
     const mo = new MutationObserver(() => { mo.disconnect(); try { arrange(); } catch (err) { trip('setupUpgLayout', err); } mo.observe(list, { childList: true }); });
     mo.observe(list, { childList: true });
@@ -4224,7 +4517,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
           if (back) back.click();
         } finally { if (sfx) NS.Audio.sfx = sfx; }
         if (cells.length) grid.replaceChildren(...cells);
-        natCache = { key, cells };
+        natCache = { key, cells, set: new WeakSet(cells) };
         for (const t of gameTabs()) t.classList.remove('on');
         addTab();
       } finally {
@@ -4239,8 +4532,19 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
       const t = e.target.closest('.gen-tab');
       if (t && t.id !== 'psmod-nat' && dexNational) { dexNational = false; save('dexNational', false); }
     }, true);
-    const obs = new MutationObserver(() => { if (!busy) redraw(); });
+    // The game also redraws just the grid (choosing a partner does): new cells
+    // that aren't ours mean the region's list is back, so National again.
+    // (Sorting and filtering move our own cells around, which is fine.)
+    const obs = new MutationObserver((recs) => {
+      if (busy) return;
+      if (recs.some((r) => r.target === gens)) return redraw();
+      if (!dexNational) return;
+      const mine = natCache && natCache.set;
+      const fresh = [...grid.children].some((c) => c.classList.contains('cell') && !(mine && mine.has(c)));
+      if (fresh) redraw();
+    });
     obs.observe(gens, { childList: true });
+    obs.observe(grid, { childList: true });
     if (gens.children.length) redraw();
   }
 
@@ -4468,6 +4772,9 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
     if (!e.isTrusted || !e.deltaY) return;
     if (isListening()) { e.preventDefault(); e.stopImmediatePropagation(); captured(e.deltaY < 0 ? 'WheelUp' : 'WheelDown'); return; }
     if (!e.target || e.target.tagName !== 'CANVAS' || onMod(e.target)) return;
+    // Only the game itself, during a run: the sprites in the Pokémon list are
+    // canvases too, and there the wheel scrolls the list.
+    if (e.target.closest('.scr') || menuMode()) return;
     if (!codeMap.has('WheelUp') && !codeMap.has('WheelDown')) return;
     e.preventDefault();
     const now = performance.now();
@@ -5121,8 +5428,47 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
   }
   // If the highlighted element was redrawn (a toggle re-rendering its
   // panel), move to whatever now sits in the same place.
-  let navLastAt = null;
+  let navLastAt = null, navKey = '', navLostAt = 0;
+  // What the highlighted thing is, to find it again after a redraw (the
+  // Upgrades list is rebuilt after every purchase, then rearranged).
+  function navKeyOf(el) {
+    if (!el) return '';
+    const row = el.closest('#upg-list .upg-item');
+    if (row) {
+      const rows = [...document.querySelectorAll('#upg-list .upg-item')];
+      const kind = el.hasAttribute('data-buy') ? 'buy' : el.hasAttribute('data-ban') ? 'ban' : el.dataset.psmMv ? 'mv:' + el.dataset.psmMv : (el.className || el.tagName);
+      return 'upg|' + rows.indexOf(row) + '|' + kind;
+    }
+    if (el.id) return 'id|' + el.id;
+    for (const a of ['data-go', 'data-px', 'data-mv', 'data-psm-mv', 'data-psm-key', 'data-a', 'data-t', 'data-gen', 'data-i']) if (el.hasAttribute(a)) return 'at|' + a + '|' + el.getAttribute(a);
+    return '';
+  }
+  function navFindKey(key) {
+    if (!key) return null;
+    const [k, a, b] = key.split('|');
+    try {
+      if (k === 'upg') {
+        const row = document.querySelectorAll('#upg-list .upg-item')[+a];
+        if (!row) return null;
+        if (b === 'buy') return row.querySelector('[data-buy]');
+        if (b === 'ban') return row.querySelector('[data-ban]');
+        if (b.startsWith('mv:')) return row.querySelector(`[data-psm-mv="${CSS.escape(b.slice(3))}"]`);
+        return null;
+      }
+      if (k === 'id') return document.getElementById(a);
+      if (k === 'at') return document.querySelector(`[${a}="${CSS.escape(key.slice(k.length + a.length + 2))}"]`);
+    } catch (_) { /* not found */ }
+    return null;
+  }
   function navFocusValid() {
+    if (navFocus && !navFocus.isConnected && navKey) {
+      const same = navFindKey(navKey);
+      if (same && same.isConnected && navVisible(same)) { navLostAt = 0; navSet(same); return navFocus; }
+      // Give the screen a moment to finish redrawing before guessing by position.
+      if (!navLostAt) navLostAt = performance.now();
+      if (performance.now() - navLostAt < 200) return navFocus;
+    }
+    navLostAt = 0;
     if (navFocus && !navFocus.isConnected && navLastAt) {
       const at = navLastAt;
       let best = null, bd = 50;
@@ -5141,7 +5487,8 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
     navStyle();
     if (navFocus) navFocus.classList.remove('psmod-padfocus');
     navFocus = el;
-    if (!el) return;
+    if (!el) { navKey = ''; return; }
+    try { navKey = navKeyOf(el); } catch (_) { navKey = ''; }
     el.classList.add('psmod-padfocus');
     try { el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch {}
   }
@@ -5155,8 +5502,11 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
     const sc = navScope();
     const el = sc ? sc.el : null;
     const inScope = (f) => !sc || sc.el.contains(f) || (sc.bar && f.closest('#topbar'));
-    if (el !== navScopeEl) { navScopeEl = el; navScopeAt = performance.now(); if (navFocus && !inScope(navFocus)) navClear(); return; }
-    if (navFocus && !inScope(navFocus)) navClear();
+    // Redrawn under the cursor: find it again first (see navFocusValid).
+    if (navFocus && !navFocus.isConnected) navFocusValid();
+    const stale = navFocus && !navFocus.isConnected;   // still waiting for the redraw
+    if (el !== navScopeEl) { navScopeEl = el; navScopeAt = performance.now(); if (navFocus && !stale && !inScope(navFocus)) navClear(); return; }
+    if (navFocus && !stale && !inScope(navFocus)) navClear();
     // Let the window finish appearing before picking something.
     if (padMode && !navFocus && navScopeAt && performance.now() - navScopeAt > 250 && !choiceCards() && !isListening()) { navScopeAt = 0; navStart(sc); }
   }
@@ -5406,6 +5756,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
 #set-body .psx-foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 8px}
 #set-body .psx-sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;border:1px solid #0b1838;box-shadow:0 0 0 1px rgba(255,255,255,.35)}
 #set-body canvas.psx-prev{display:block;width:100%;max-width:440px;height:auto;margin:6px 0 8px;border-radius:10px;box-shadow:0 0 0 2px rgba(244,248,255,.2)}
+#set-body .psx-pre{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:7px;font-size:11px;vertical-align:middle;color:#fff;background:linear-gradient(180deg,#b996ff,#8a5cf0);text-shadow:none}
 #set-body .psx-prev-row{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}
 #set-body .psx-prev-row canvas.psx-prev{width:auto;max-width:100%}
 #set-body .psx-cap{font-size:11px;color:var(--muted,#b9cbf0);margin:-4px 0 6px}
@@ -6094,6 +6445,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
         <h3 class="set-h">Panels and messages</h3>
         ${srow('Damage panel', 'Damage per player and per attack, plus your upgrades. Shown with Tab (see Controls). Alt + M turns it off.', sw('panel', shown))}
         ${srow('Always show the damage panel', 'Keep it on screen instead of using Tab.', sw('always', panelAlways, !shown))}
+        ${srow('Low health glow', 'A soft red glow around the screen while your health is under 20%.', sw('lowhp', lowHpOn))}
         <h3 class="set-h">Debug view</h3>
         ${srow('Player hitboxes', 'Where you (green) and teammates (blue) can be hit. Off by default.', sw('hitboxmine', hitboxMine))}
         ${srow('Enemy hitboxes', 'Where enemies (red) and bosses (orange) can be hit. Off by default.', sw('hitboxfoe', hitboxFoe))}
@@ -6136,6 +6488,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
         ${srow('Colour correction', 'Shifts the game’s colours so the ones you have trouble with are easier to tell apart. The swatches below change with it.', '')}
         ${chips([['cb:off', 'Off', cbMode === 'off'], ['cb:protan', 'Protanopia (red)', cbMode === 'protan'], ['cb:deutan', 'Deuteranopia (green)', cbMode === 'deutan'], ['cb:tritan', 'Tritanopia (blue)', cbMode === 'tritan']])}
         <div class="psx-swatches">${sw8.map((t) => `<i style="background:${TYPE[t]}">${cap(tr(t))}</i>`).join('')}<i style="background:#e83a4a;color:#fff">Health</i><i style="background:#46c96a">Heal</i><i style="background:#3aa6ff">Exp</i></div>
+        ${cbMode !== 'off' ? srow('Apply to', 'Only the interface (menus, windows and the HUD), or the Pokémon and the scene too.', '') + chips([['cbscope:ui', 'UI only', cbScope === 'ui'], ['cbscope:all', 'UI and Pokémon / scene', cbScope !== 'ui']]) : ''}
         ${cbMode !== 'off' ? srow('Strength', 'How far confusable colours are pushed apart. Reset is the tuned amount; go higher if some still look alike.', step('cbs', pct(cbStrength / CB_DEFAULT))) : ''}
         <h3 class="set-h">Motion</h3>
         ${srow('Less shake and flashes', 'The camera shakes less and flashes are softer (the game’s own setting).', sw('calm', calm))}
@@ -6143,6 +6496,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
     }
     if (tab === 'psmod-extras') {
       return `<h3 class="set-h">Co-op</h3>
+        ${srow('Rooms of up to 8 players', 'Up to 8 players in a room when the host has PokeSurvivor Plus (players 5–8 need it too). Enemies scale up gently with each extra player. Runs with more than 4 players never go on the leaderboard and don’t change your best times.', sw('bigrooms', bigRooms))}
         ${srow('Spectate while down', 'Watch a teammate while you wait to be revived (switch with previous / next attack). Full view when the host also has PokeSurvivor Plus.', sw('spec', specOn))}
         ${srow('Pings', 'Hold G (R3 on a controller) for a wheel: Help, Boss, Chest, Here. Shown to teammates with PokeSurvivor Plus.', sw('pings', pingsOn))}
         ${pingsOn ? srow('Pings in the chat', 'A line in the chat for each teammate’s ping (“Mira: Help!”).', sw('pingchat', pingChat)) + srow('Ping sounds', 'A short sound for each ping, different for Help, Boss, Chest and Here.', sw('pingsound', pingSound)) : ''}
@@ -6160,7 +6514,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
         ${statusHtml()}
         <h3 class="set-h">Help</h3>
         <div class="psx-foot"><button class="btn small" data-px="tour">Replay the welcome tour</button><button class="btn small" data-px="news">What’s new in PokeSurvivor Plus</button></div>
-        <p class="note">PokeSurvivor Plus ${esc(PLUS_VERSION)}. Alt + K opens the Controls tab.</p>
+        <p class="note">PokeSurvivor Plus ${esc(PLUS_LABEL)}. Alt + K opens the Controls tab.</p>
         <p class="note">Credits: HUD portraits from <a href="https://github.com/PMDCollab/SpriteCollab" target="_blank" rel="noopener">PMDCollab SpriteCollab</a> (CC BY-NC 4.0), like the game’s sprites. ${tierCredit()}.</p>`;
     }
     return '';
@@ -6249,6 +6603,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
       case 'sound': setAlertSound(!alertSound); break;
       case 'sound-test': { const was = alertSound; alertSound = true; sparkleAt = 0; sparkle(); alertSound = was; break; }
       case 'spec': specOn = !specOn; save('spectate', specOn); break;
+      case 'bigrooms': bigRooms = !bigRooms; save('bigRooms', bigRooms); syncBigRooms(); break;
       case 'pings': pingsOn = !pingsOn; save('pingsOn', pingsOn); break;
       case 'pingchat': pingChat = !pingChat; save('pingChat', pingChat); break;
       case 'pingsound': pingSound = !pingSound; save('pingSound', pingSound); if (pingSound) blip('here'); break;
@@ -6262,9 +6617,11 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
       case 'ban': if (arg in banSet || BANNER_CATS.some(([k]) => k === arg)) { banSet[arg] = !banSet[arg]; save('bannerSet', banSet); } break;
       case 'notif': notif[arg] = !notif[arg]; save('notif', notif); applyNotif(); break;
       case 'hitboxmine': hitboxMine = !hitboxMine; save('hitboxMine', hitboxMine); break;
+      case 'lowhp': lowHpOn = !lowHpOn; save('lowHp', lowHpOn); break;
       case 'hitboxfoe': hitboxFoe = !hitboxFoe; save('hitboxFoe', hitboxFoe); break;
       case 'fpsbox': setFpsWanted(!fpsWanted()); break;
       case 'cb': setCb(arg, cbStrength); break;
+      case 'cbscope': cbScope = arg === 'ui' ? 'ui' : 'all'; save('cbScope', cbScope); applyCb(); break;
       case 'cbs': setCb(cbMode, d === 0 ? CB_DEFAULT : CB_DEFAULT * Math.max(0.2, Math.min(1.6, Math.round((cbStrength / CB_DEFAULT + d * 0.1) * 10) / 10))); break;
       case 'calm': if (NS && NS.Settings) NS.Settings.set('calm', !NS.Settings.get('calm')); break;
       case 'rmotion': reduceMotion = !reduceMotion; save('reduceMotion', reduceMotion); document.documentElement.classList.toggle('psmod-calm', reduceMotion); break;
@@ -6430,6 +6787,13 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
   // past what the screen can show.
   const CB_DEFAULT = 1;
   let cbMode = load('cbMode', 'off'), cbStrength = load('cbStrength', CB_DEFAULT);
+  // 'all': the whole page (Pokémon and the scene too); 'ui': only the
+  // interface — the page minus the game's canvas, plus the HUD drawn on it.
+  let cbScope = load('cbScope', 'all');
+  const cbUiOnly = () => cbMode !== 'off' && cbScope === 'ui';
+  let cbLayer = null, cbLayerAt = 0;
+  // No HUD drawn lately (a menu, the Judgment's cinematic…): the layer goes.
+  setInterval(() => { if (cbLayer && cbLayer.style.display !== 'none' && (!cbUiOnly() || performance.now() - cbLayerAt > 150)) cbLayer.style.display = 'none'; }, 100);
   const CB_SIM = {
     protan: [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216], [-0.003882, -0.048116, 1.051998]],
     deutan: [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.011820, 0.042940, 0.968881]],
@@ -6458,7 +6822,17 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
   function applyCb() {
     if (!document.body) return;
     let svg = document.getElementById('psmod-cb-svg');
-    if (cbMode === 'off') { document.documentElement.style.filter = ''; return; }
+    const root = document.documentElement;
+    if (cbMode === 'off') { root.style.filter = ''; root.classList.remove('psm-cb-ui'); return; }
+    if (!document.getElementById('psmod-cb-css')) {
+      const st = document.createElement('style');
+      st.id = 'psmod-cb-css';
+      // A filter makes an element the box its position:fixed children are
+      // placed in, so the top bar (Support is fixed inside it) is filtered
+      // child by child instead.
+      st.textContent = 'html.psm-cb-ui body > :not(#game):not(#topbar):not(script):not(noscript):not(#psmod-cb-svg),html.psm-cb-ui #topbar > *{filter:url(#psmod-cb)}';
+      document.head.appendChild(st);
+    }
     if (!svg) {
       svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       svg.id = 'psmod-cb-svg';
@@ -6468,9 +6842,50 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
     }
     const m = cbMatrix(cbMode, cbStrength);
     svg.querySelector('feColorMatrix').setAttribute('values', m.map((r) => r.map((v) => v.toFixed(4)).join(' ') + ' 0 0').join(' ') + ' 0 0 0 1 0');
-    document.documentElement.style.filter = 'url(#psmod-cb)';
+    root.style.filter = cbScope === 'ui' ? '' : 'url(#psmod-cb)';
+    root.classList.toggle('psm-cb-ui', cbScope === 'ui');
+    wrapCbHud();
+  }
+  // The HUD is drawn on the game's canvas: in "UI only" it's drawn on a layer
+  // the filter covers. This must be the outermost wrapper of HUD.draw (ours
+  // for the redesigned HUD draws parts of it too), so it's put back on top
+  // whenever something wraps HUD.draw after it.
+  function wrapCbHud() {
+    if (NS && NS.HUD && NS.HUD.draw && !NS.HUD.draw.__psmCb) {
+      const d = NS.HUD.draw;
+      // The HUD is drawn on the game's canvas with the Pokémon and the scene.
+      // In "UI only" it goes onto a canvas of its own laid exactly over the
+      // game's, which the page filter covers like the rest of the interface.
+      NS.HUD.draw = function (ctx) {
+        if (!cbUiOnly() || !ctx || !ctx.canvas || ctx.canvas === cbLayer) return d.apply(this, arguments);
+        const cv = ctx.canvas;
+        if (!cbLayer) {
+          cbLayer = document.createElement('canvas');
+          cbLayer.id = 'psmod-cbhud';
+          cbLayer.style.cssText = 'position:fixed;pointer-events:none;z-index:1;display:none;will-change:transform';
+          document.body.appendChild(cbLayer);
+        }
+        if (cbLayer.width !== cv.width || cbLayer.height !== cv.height) { cbLayer.width = cv.width; cbLayer.height = cv.height; }
+        const r = cv.getBoundingClientRect(), st = cbLayer.style;
+        const L = r.left + 'px', T = r.top + 'px', W = r.width + 'px', Hh = r.height + 'px';
+        if (st.left !== L || st.top !== T || st.width !== W || st.height !== Hh) Object.assign(st, { left: L, top: T, width: W, height: Hh });
+        if (st.display === 'none') st.display = 'block';
+        const lc = cbLayer.getContext('2d');
+        lc.setTransform(1, 0, 0, 1, 0, 0);
+        lc.clearRect(0, 0, cbLayer.width, cbLayer.height);
+        lc.setTransform(ctx.getTransform());
+        lc.imageSmoothingEnabled = ctx.imageSmoothingEnabled;
+        cbLayerAt = performance.now();
+        const args = [...arguments]; args[0] = lc;
+        return d.apply(this, args);
+      };
+      NS.HUD.draw.__psmCb = true;
+    }
   }
   onReady(applyCb);
+  waitFor(() => NS && NS.HUD && NS.HUD.draw && document.body, applyCb, "cbHud");
+  // Kept the outermost wrapper of HUD.draw (see wrapCbHud).
+  setInterval(() => { if (cbUiOnly()) try { wrapCbHud(); } catch (_) { /* ignore */ } }, 1000);
 
   // ------------------------------------------------ attack effect opacity / size
   // Separately for your attacks and your teammates'. Projectiles and orbs
@@ -6707,6 +7122,45 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
     return html + '<div class="ds" style="margin:4px 0 0;color:#b9cbf0">Numbers at level 1, with its attack.</div>';
   }
   let mtipEl = null;
+  // Anything that names a move can show what it does: the Pokémon page's
+  // chips, and on the Upgrades screen the Ban list and Move shortcuts.
+  const MOVE_TIP_SEL = '.psd-mv[data-mv], [data-psm-mv], #cards .card[data-psm-key]';
+  // Level-up cards: the offers behind them (in the same order).
+  let lvlOffers = [];
+  function lvlCardTip(key) {
+    const pl = me(), Mv = NS.Moves;
+    const [type, id] = String(key).split(':');
+    if (!pl || !Mv || !Mv.instance || !id || !(type === 'new' || type === 'up' || type === 'evo')) return '';
+    const cur = (pl.moves || []).find((m) => m.id === id);
+    if (type === 'new') return `<div class="nx" style="margin:0 0 4px">New move</div>` + moveTip(Mv.instance(id, 1), pl);
+    if (!cur) return '';
+    if (type === 'evo' || cur.evolved) return moveTip(cur, pl);
+    const nxt = Mv.instance(id, cur.lvl + 1);
+    const atk = pl.atk || 1, cdm = pl.cdMul || 1;
+    const ch = [];
+    const cmp = (label, a, b, fmt) => { if (a != null && b != null && Math.abs(a - b) > 1e-6) ch.push(`<div class="kv"><span>${label}</span><b>${fmt(a)} → <span style="color:#7dff9a">${fmt(b)}</span></b></div>`); };
+    cmp('Damage', cur.dmg != null ? cur.dmg * atk : null, nxt.dmg != null ? nxt.dmg * atk : null, (v) => Math.round(v));
+    cmp('Cooldown', cur.cd != null ? cur.cd * cdm : null, nxt.cd != null ? nxt.cd * cdm : null, (v) => v.toFixed(2) + ' s');
+    cmp(cur.kind === 'orbit' ? 'Orbs' : 'Count', cur.count || 1, nxt.count || 1, (v) => v);
+    cmp('Pierce', cur.pierce || 0, nxt.pierce || 0, (v) => v);
+    cmp(cur.kind === 'aura' || cur.kind === 'orbit' ? 'Radius' : 'Range', cur.radius, nxt.radius, (v) => Math.round(v));
+    cmp('Duration', cur.dur, nxt.dur, (v) => v.toFixed(1) + ' s');
+    if (cur.kind === 'buff') cmp('Boost', cur.amount, nxt.amount, (v) => '+' + Math.round(v * 100) + '%');
+    return moveTip(nxt, pl) + (ch.length ? `<hr><div class="lv" style="margin-bottom:2px">Lv. ${cur.lvl} → ${cur.lvl + 1}</div><div class="st">${ch.join('')}</div>` : '');
+  }
+  function tagLvlCards() {
+    const box = document.getElementById('cards');
+    if (!box) return;
+    const cards = box.querySelectorAll(':scope > .card');
+    if (cards.length !== lvlOffers.length) return;
+    cards.forEach((el, i) => { const k = (lvlOffers[i] && lvlOffers[i].key) || ''; if (el.dataset.psmKey !== k) el.dataset.psmKey = k; });
+  }
+  waitFor(() => NS && NS.LevelUp && NS.LevelUp.offer && NS.RunUI && NS.RunUI.showLevelUp, function setupLvlTips() {
+    const offer = NS.LevelUp.offer, showLv = NS.RunUI.showLevelUp;
+    NS.LevelUp.offer = function () { const r = offer.apply(this, arguments); if (Array.isArray(r)) { lvlOffers = r; setTimeout(tagLvlCards, 0); } return r; };
+    NS.RunUI.showLevelUp = function (level, list) { if (Array.isArray(list)) lvlOffers = list; const r = showLv.apply(this, arguments); tagLvlCards(); return r; };
+    setupMoveTips();
+  }, 'lvlTips');
   function setupMoveTips() {
     if (mtipEl) return;
     mtipEl = document.createElement('div');
@@ -6716,6 +7170,14 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
     let cur = null;
     const place = (chip) => {
       const r = chip.getBoundingClientRect(), w = mtipEl.offsetWidth, h = mtipEl.offsetHeight;
+      // In a drop-down list (Move shortcuts): beside the list, not over it.
+      const pop = chip.closest('#psmod-mvpop, #cards');
+      if (pop) {
+        const pr = pop.getBoundingClientRect();
+        const x = pr.right + 8 + w <= innerWidth - 8 ? pr.right + 8 : Math.max(8, pr.left - 8 - w);
+        mtipEl.style.left = x + 'px'; mtipEl.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.top + r.height / 2 - h / 2)) + 'px';
+        return;
+      }
       let x = r.left + r.width / 2 - w / 2, y = r.top - h - 8;
       if (y < 8) y = r.bottom + 8;
       x = Math.max(8, Math.min(innerWidth - w - 8, x));
@@ -6724,18 +7186,21 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
     const show = (chip) => {
       if (cur === chip) return;
       cur = chip;
-      try { mtipEl.innerHTML = catalogTip(chip.dataset.mv, +chip.dataset.dex); } catch (err) { trip('moveList', err); return; }
+      const id = chip.dataset.mv || chip.dataset.psmMv;
+      const dex = +chip.dataset.dex || +((document.getElementById('upg-mon') || {}).value) || 0;
+      try { mtipEl.innerHTML = chip.dataset.psmKey != null && !id ? lvlCardTip(chip.dataset.psmKey) : catalogTip(id, dex); } catch (err) { trip('moveList', err); return; }
+      if (!mtipEl.innerHTML) { mtipEl.hidden = true; return; }
       mtipEl.hidden = false;
       place(chip);
     };
     const hide = () => { cur = null; mtipEl.hidden = true; };
     document.addEventListener('pointerover', (e) => {
-      const chip = e.target && e.target.closest && e.target.closest('.psd-mv[data-mv]');
+      const chip = e.target && e.target.closest && e.target.closest(MOVE_TIP_SEL);
       if (chip) show(chip); else if (cur) hide();
     }, true);
     // The controller cursor shows it too.
     setInterval(() => {
-      const f = navFocus && navFocus.matches && navFocus.matches('.psd-mv[data-mv]') ? navFocus : null;
+      const f = navFocus && navFocus.matches && navFocus.matches(MOVE_TIP_SEL) ? navFocus : null;
       if (f) show(f); else if (cur && !cur.matches(':hover')) hide();
       if (cur && !cur.isConnected) hide();
     }, 150);
@@ -7258,14 +7723,14 @@ body:has(.scr.dim:not(.hidden)) #psmod-favwrap :is(.psmod-favarr,#psmod-favcount
   box-shadow:0 0 0 3px var(--edge-out,#0b1838),inset 0 0 0 2px var(--edge-in,#5b83d6);text-shadow:2px 2px 0 var(--shadow,#0a1430);z-index:2}
 #psmod-party[hidden]{display:none}
 #psmod-party .pt{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;letter-spacing:.12em;color:var(--gold,#ffd23f);font-weight:700;text-align:center}
-#psmod-party .pms{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;min-width:0}
-#psmod-party .pm{display:flex;gap:8px;align-items:center;padding:4px 10px 4px 4px;border-radius:9px;background:rgba(0,0,0,.25);min-width:140px}
+#psmod-party .pms{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;min-width:0}
+#psmod-party .pm{display:flex;gap:10px;align-items:center;padding:6px 12px 6px 6px;border-radius:10px;background:rgba(0,0,0,.25);min-width:168px}
 #psmod-party .pm .lv{color:var(--gold,#ffd23f)}
 @media (max-height:660px){#psmod-party{margin-top:6px;padding:5px 8px}#psmod-party .pm{min-width:0;padding:3px 8px 3px 3px}#psmod-party .pm img{width:30px;height:30px}#psmod-party .pm b{font-size:12px}#psmod-party .pm small{font-size:10px}}
 @media (max-height:520px){#psmod-party{display:none}}
-#psmod-party .pm img{width:40px;height:40px;image-rendering:pixelated;border:2px solid var(--edge,#f4f8ff);border-radius:6px;background:rgba(95,200,255,.25)}
-#psmod-party .pm b{display:block;font-size:14px}
-#psmod-party .pm small{display:block;font-size:12px;color:var(--muted,#b9cbf0)}
+#psmod-party .pm img{width:52px;height:52px;image-rendering:pixelated;border:2px solid var(--edge,#f4f8ff);border-radius:6px;background:rgba(95,200,255,.25)}
+#psmod-party .pm b{display:block;font-size:16px}
+#psmod-party .pm small{display:block;font-size:13px;color:var(--muted,#b9cbf0)}
 #psmod-party .pm.host b::after{content:' ★';color:var(--gold,#ffd23f)}`;
     document.head.appendChild(st);
     const box = document.createElement('div');
@@ -7304,7 +7769,7 @@ body:has(.scr.dim:not(.hidden)) #psmod-favwrap :is(.psmod-favarr,#psmod-favcount
         const src = PORTRAIT_BASE + String(m.dex || 0).padStart(4, '0') + (m.shiny ? '/0000/0001' : '') + '/Normal.png';
         const lvl = lvlOf(m);
         const lv = lvl == null ? '' : ` · <span class="lv" title="Upgrade level ${lvl} / ${max}">Lv. ${lvl}</span>`;
-        return `<div class="pm${m.uid === room.host ? ' host' : ''}"><img src="${src}" alt="" data-dex="${m.dex}" translate="no">
+        return `<div class="pm${m.uid === room.host ? ' host' : ''}" data-uid="${esc(m.uid)}"><img src="${src}" alt="" data-dex="${m.dex}" translate="no">
           <div><b translate="no">${esc(m.name || '?')}</b><small>${esc(tr(mon.name || '—'))}${m.shiny ? ' ✦' : ''}${lv}</small></div></div>`;
       }).join('') + '</div>';
       // Shiny portrait missing → the normal one.
@@ -7337,6 +7802,7 @@ body:has(.scr.dim:not(.hidden)) #psmod-favwrap :is(.psmod-favarr,#psmod-favcount
 #psmod-roombar .rb-st{flex:1;font-size:12px;color:var(--muted,#b9cbf0);min-width:0}
 #psmod-roombar .rb-st.warn{color:#ffcb3d}
 #psmod-roombar #psmod-lchat{margin:0}
+#psmod-roombar .btn.psm-leave{background:linear-gradient(180deg,#d8495b,#9a2232);border-color:var(--edge,#f4f8ff);color:#fff}
 #psmod-roombar #psmod-lchat .log{height:84px;font-size:13px}
 #psmod-roombar #psmod-lchat .note2{display:none}
 #scr-menu.psm-room #psmod-party{margin-top:8px}
@@ -7345,7 +7811,7 @@ body:has(.scr.dim:not(.hidden)) #psmod-favwrap :is(.psmod-favarr,#psmod-favcount
     const bar = document.createElement('div');
     bar.id = 'psmod-roombar';
     bar.hidden = true;
-    bar.innerHTML = '<div class="rb-top"><span class="rb-st"></span><button class="btn small" data-a="invite">Invite</button><button class="btn small ghost" data-a="leave">Leave room</button></div>';
+    bar.innerHTML = '<div class="rb-top"><span class="rb-st"></span><button class="btn small" data-a="invite">Invite</button><button class="btn small danger psm-leave" data-a="leave">Leave room</button></div>';
     left.appendChild(bar);
     const status = bar.querySelector('.rb-st');
     bar.addEventListener('click', async (e) => {
@@ -7392,7 +7858,7 @@ body:has(.scr.dim:not(.hidden)) #psmod-favwrap :is(.psmod-favarr,#psmod-favcount
       else txt = `Your room · ${n}/${max} ready`;
       if (status.textContent !== txt) status.textContent = txt;
       status.classList.toggle('warn', warn);
-      bar.querySelector('[data-a="invite"]').hidden = !s.room.isHost || n >= max;
+      bar.querySelector('[data-a="invite"]').hidden = n >= max;   // anyone in the room can invite
       const want = !s.room.isHost ? `Waiting for ${s.host.name || 'the host'} to start` : n < 2 ? 'Play solo (leaves the room)' : `Start the co-op run (${n}/${max})`;
       if (sub && sub.textContent !== want) sub.textContent = want;
     }
@@ -7422,6 +7888,390 @@ body:has(.scr.dim:not(.hidden)) #psmod-favwrap :is(.psmod-favarr,#psmod-favcount
     draw();
   }
   waitFor(() => NS && NS.LobbyUI && NS.Social && NS.Flow && NS.MenuUI && document.querySelector('#scr-menu [data-go="play"]') && document.getElementById('psmod-party'), setupLobbyMenu);
+
+  // ------------------------------------------------ friends & rooms
+  // Friends list: what each friend is doing (online, in a lobby, in a run)
+  // and a Join button for a friend's lobby. Anyone in a room can invite
+  // friends (not only the host). Room codes: the room's ID, shown on request,
+  // for players who aren't your friends (streams), with a join link; the
+  // host's room says "full" when every place is taken, and the host can
+  // remove players. All of it through the game's own rooms: no server.
+  const ROOM_ID_RE = /^(?:\d{6}|-?[A-Za-z0-9_-]{12,40})$/;
+  const roomFromText = (t) => {
+    const s = String(t || '').trim();
+    const m = /#join=([A-Za-z0-9_-]+)/.exec(s);
+    const id = (m ? m[1] : s).replace(/^(\d{3})[\s-](\d{3})$/, '$1$2');   // "482 913" too
+    return ROOM_ID_RE.test(id) ? id : null;
+  };
+  const roomLink = (id) => location.origin + (location.pathname || '/') + '#join=' + id;
+  const sayUi = (t) => { try { NS.UI.toast(t, 2800); } catch (_) { toast(t); } };
+  // "Create room": a room of your own with a short code (6 digits) instead
+  // of the game's long random ID. The game makes the ID itself when it creates
+  // a room; for this one it's handed a free 6-digit number instead (the
+  // game's database lets the creator pick the room's name). Rooms the game
+  // makes when you invite someone keep their long, unguessable ID.
+  async function createCodeRoom() {
+    const S = NS.Social, fb = NS.DB.fb, db = fb && fb.rtdb;
+    if (!S || !db) return false;
+    if (S.room) { NS.LobbyUI && NS.LobbyUI.open(); return true; }
+    let code = null;
+    try {
+      db.goOnline();
+      for (let i = 0; i < 8 && !code; i++) {
+        const c = String(100000 + Math.floor(Math.random() * 900000));
+        const h = (await db.ref('rooms/' + c + '/host').get()).val();
+        if (!h) code = c;
+      }
+    } catch (_) { code = null; }
+    const ref = db.ref;
+    if (code) {
+      db.ref = function (p) {
+        const r = ref.apply(this, arguments);
+        if (p === 'rooms' && r && typeof r.push === 'function') { r.push = () => ({ key: code }); db.ref = ref; }
+        return r;
+      };
+    }
+    try { await S.createRoom(); }
+    catch (err) {
+      // Taken in the meantime (or not allowed): the game's own kind of room.
+      db.ref = ref;
+      try { await S.createRoom(); } catch (_) { return false; }
+    } finally { if (db.ref !== ref) db.ref = ref; }
+    return !!S.room;
+  }
+  // Join a room by its ID (also used by the friends list and links).
+  async function joinById(id) {
+    const S = NS.Social;
+    if (!S) return;
+    if (S.room && S.room.id === id) { NS.LobbyUI && NS.LobbyUI.open(); return; }
+    if (NS.Coop && NS.Coop.active) { sayUi('Finish your run first'); return; }
+    if (S.room && S.room.members && S.room.members.length > 1) { sayUi('Leave your room first'); return; }
+    let r;
+    try { r = await S.joinRoom(id); } catch (err) { r = { ok: false, error: 'Couldn’t join the room.' }; }
+    if (r && r.ok) { try { NS.Net.open(S.room.id, S.room.isHost, S.room.host); } catch (_) { /* the game does it too */ } NS.LobbyUI && NS.LobbyUI.open(); }
+    else sayUi((r && r.error) || 'Couldn’t join the room.');
+  }
+  function setupFriendsRooms() {
+    const S = NS.Social, F = NS.FriendsUI;
+    if (!S || !F || F.__psmRooms) return;
+    F.__psmRooms = true;
+    const st = document.createElement('style');
+    st.textContent = `
+#fr-list .fr-row .st.psm-lobby{color:#7ee07a}
+#fr-list .fr-row .st.psm-run{color:#ffcb3d}
+#psmod-codejoin{display:flex;gap:6px;align-items:center;margin:6px 0 8px}
+#psmod-codejoin input{flex:1;min-width:0;padding:6px 10px;font:inherit;font-size:14px;color:#fff;background:rgba(0,0,0,.3);border:2px solid rgba(244,248,255,.35);border-radius:9px;outline:none}
+#psmod-codejoin input:focus{border-color:#ffd23f}
+#psmod-roombar .rb-code{display:grid;gap:6px;font-size:12px}
+#psmod-roombar .rb-code[hidden]{display:none}
+#psmod-roombar .rb-code .warn{color:#ffcb3d;line-height:1.35}
+#psmod-roombar .rb-code .row2{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#psmod-roombar .rb-code code.short{font-size:20px;letter-spacing:3px;text-align:center;color:#ffd23f}
+#psmod-roombar .rb-code code{flex:1 1 180px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:4px 8px;border-radius:7px;background:rgba(0,0,0,.35);font:13px ui-monospace,Consolas,monospace;color:#fff;user-select:all}
+#psmod-party .pm{position:relative}
+#psmod-party .pm .pm-x{margin-left:auto;align-self:center;display:inline-flex;align-items:center;gap:5px;height:26px;min-width:26px;box-sizing:border-box;padding:0 7px;border-radius:8px;
+  font:700 11px var(--font,'Pixelify',system-ui,sans-serif);color:#ffd0d5;background:rgba(255,95,109,.14);border:2px solid rgba(255,138,150,.45);cursor:pointer;text-shadow:1px 1px 0 #0a1430;transition:background .12s,border-color .12s}
+#psmod-party .pm .pm-x i{font-style:normal;font-size:12px;line-height:1}
+#psmod-party .pm .pm-x span{display:none}
+#psmod-party .pm:hover .pm-x span,#psmod-party .pm .pm-x:focus-visible span,#psmod-party .pm .pm-x.psmod-padfocus span,#psmod-party .pm .pm-x.armed span{display:inline}
+#psmod-party .pm .pm-x:hover,#psmod-party .pm .pm-x.psmod-padfocus{background:rgba(255,95,109,.32);border-color:#ff8a96;color:#fff}
+#psmod-party .pm .pm-x.armed{background:linear-gradient(180deg,#e0505f,#a0222f);border-color:#f4f8ff;color:#fff}
+#psmod-joinask{position:fixed;inset:0;z-index:100003;display:grid;place-items:center;background:rgba(5,10,30,.55)}
+#psmod-joinask .box{max-width:min(420px,calc(100vw - 32px));text-align:center}
+#psmod-joinask p{margin:6px 0 12px;color:var(--muted,#b9cbf0);font-size:13px;line-height:1.4}`;
+    document.head.appendChild(st);
+
+    // ---- friends list
+    const friendOf = (name) => (S.friends || []).find((f) => f.name === name);
+    const statusOf = (f, room) => {
+      if (room && room.members.some((m) => m.uid === f.uid)) return null;       // the game says "in your room"
+      if (f.status !== 'ok' || !f.online) return null;                          // the game's own text
+      if (f.play) return [f.room ? 'In a co-op run' : 'In a solo run', 'psm-run'];
+      if (f.room) return [room && room.id === f.room ? 'In your room' : 'In a lobby', 'psm-lobby'];
+      return ['Online', ''];
+    };
+    // The game redraws the list from inside (not through FriendsUI.render),
+    // so each new list is decorated as it appears.
+    const frList = document.getElementById('fr-list');
+    new MutationObserver(() => { try { decorate(); } catch (err) { trip('friendsRooms', err); } }).observe(frList, { childList: true });
+    function decorate() {
+      const room = S.room, list = document.getElementById('fr-list');
+      if (!list) return;
+      for (const row of list.querySelectorAll(':scope > .fr-row')) {
+        const a = row.querySelector('.plink'), f = a && friendOf(a.textContent);
+        if (!f) continue;
+        const stEl = row.querySelector('.st'), stx = statusOf(f, room);
+        if (stEl && stx) { stEl.textContent = stx[0]; stEl.className = 'st ' + stx[1]; }
+        const before = row.querySelector('button.ghost:last-of-type');
+        const add = (txt, cls, fn) => {
+          const b = document.createElement('button');
+          b.className = 'btn small ' + cls; b.textContent = txt; b.dataset.psm = '1';
+          b.onclick = fn;
+          row.insertBefore(b, before || null);
+          return b;
+        };
+        if (f.status !== 'ok') continue;
+        const inMine = room && room.members.some((m) => m.uid === f.uid);
+        // Join their lobby (not while they're in a run).
+        if (f.online && !f.play && f.room && !(room && room.id === f.room)) add('Join', 'gold', () => joinById(f.room));
+        // Anyone in a room can invite (the game only shows it to the host).
+        if (room && !room.isHost && f.online && !f.play && !inMine && !row.querySelector('button.gold:not([data-psm])')) {
+          add('Invite', 'gold', async () => { const r = await S.invite(f.uid); sayUi(r && r.ok ? r.msg : (r && r.error) || 'Couldn’t send the invite.'); });
+        }
+      }
+    }
+    // Statuses stay fresh while the list is open (the game reads them at most once a minute).
+    setInterval(() => { try { if (isShown('scr-friends')) S.refreshPresence(); } catch (_) { /* offline */ } }, 30000);
+    // "Play in a group, up to 4" on the main menu: up to 8 with bigger rooms on.
+    setInterval(() => {
+      const el = document.getElementById('menu-friends-sub');
+      if (el && /(up to|hasta) [48]$/.test(el.textContent)) { const want = el.textContent.replace(/[48]$/, String(bigRooms ? BIG_MAX : GAME_MAX)); if (el.textContent !== want) el.textContent = want; }
+    }, 1000);
+
+    // ---- join with a code (friends screen)
+    const form = document.getElementById('fr-add');
+    if (form && !document.getElementById('psmod-codejoin')) {
+      const box = document.createElement('form');
+      box.id = 'psmod-codejoin';
+      box.innerHTML = '<input type="text" placeholder="Room code or link" spellcheck="false" autocomplete="off" translate="no"><button class="btn small gold" type="submit">Join room</button><button class="btn small" type="button" data-psm="create">Create room</button>';
+      box.querySelector('[data-psm="create"]').addEventListener('click', async (e) => {
+        e.preventDefault(); e.currentTarget.blur();
+        if (S.room) { sayUi('You’re already in a room'); NS.LobbyUI.open(); return; }
+        if (NS.Coop && NS.Coop.active) { sayUi('Finish your run first'); return; }
+        const ok = await createCodeRoom();
+        if (!ok) { sayUi('Couldn’t create the room.'); return; }
+        try { NS.Net.open(S.room.id, true, S.room.host); } catch (_) { /* the game does it too */ }
+        NS.LobbyUI.open();
+        // Straight to the code, to share it.
+        setTimeout(() => { const b = document.querySelector('#psmod-roombar [data-a="code"]'); const pnl = document.querySelector('#psmod-roombar .rb-code'); if (b && pnl && pnl.hidden) b.click(); }, 300);
+      });
+      form.after(box);
+      const inp = box.querySelector('input');
+      inp.addEventListener('keydown', (e) => e.stopPropagation());
+      box.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = roomFromText(inp.value);
+        if (!id) { sayUi('That doesn’t look like a room code'); return; }
+        inp.value = '';
+        joinById(id);
+      });
+    }
+
+    // ---- invites from anyone in the room
+    const invite = S.invite;
+    const sent = new Map();   // room id -> Set of uids we invited (taken back on leaving)
+    S.invite = async function (other) {
+      const room = S.room;
+      if (!room || room.isHost) return invite.apply(this, arguments);
+      const f = (S.friends || []).find((x) => x.uid === other);
+      if (!f || f.status !== 'ok') return { ok: false, error: 'You can only invite your friends.' };
+      const host = room.members.find((m) => m.uid === room.host) || {};
+      const max = +host.psmax > GAME_MAX ? Math.min(BIG_MAX, +host.psmax) : GAME_MAX;
+      if (room.members.length >= max) return { ok: false, error: 'The room is full.' };
+      const fb = NS.DB.fb, me = S.me;
+      if (!fb || !fb.fs || !me) return { ok: false, error: 'Couldn’t send the invite.' };
+      try {
+        await fb.fs.collection('inv').doc(other + '_' + fb.uid).set({ to: other, from: fb.uid, room: room.id, name: me.name, at: firebase.firestore.FieldValue.serverTimestamp() });
+      } catch (err) { return { ok: false, error: 'Couldn’t send the invite (' + ((err && err.code) || 'error') + ').' }; }
+      if (!sent.has(room.id)) sent.set(room.id, new Set());
+      sent.get(room.id).add(other);
+      return { ok: true, msg: 'Invite sent to ' + f.name };
+    };
+    const leave = S.leaveRoom;
+    S.leaveRoom = async function () {
+      const id = S.room && S.room.id, fb = NS.DB.fb;
+      if (id && sent.has(id) && fb && fb.fs) { for (const o of sent.get(id)) fb.fs.collection('inv').doc(o + '_' + fb.uid).delete().catch(() => {}); sent.delete(id); }
+      return leave.apply(this, arguments);
+    };
+  }
+  waitFor(() => NS && NS.Social && NS.Social.invite && NS.Social.leaveRoom && NS.FriendsUI && NS.FriendsUI.render && NS.LobbyUI && document.getElementById('fr-list'), setupFriendsRooms, 'friendsRooms');
+
+  // Upgrades always open on your partner, and the room shows your new
+  // partner as soon as you pick one (the game only told the room when you
+  // opened its old room screen).
+  function setupPartnerSync() {
+    const scr = document.getElementById('scr-upgrades');
+    if (scr) {
+      let open = !scr.classList.contains('hidden');
+      new MutationObserver(() => {
+        const now = !scr.classList.contains('hidden');
+        if (now && !open) {
+          const sel = document.getElementById('upg-mon'), s = NS.DB && NS.DB.save;
+          if (sel && s && s.partner && String(sel.value) !== String(s.partner) && [...sel.options].some((o) => o.value === String(s.partner))) {
+            const sfx = NS.Audio && NS.Audio.sfx;
+            if (sfx) NS.Audio.sfx = () => {};
+            try { sel.value = String(s.partner); sel.dispatchEvent(new Event('change')); } finally { if (sfx) NS.Audio.sfx = sfx; }
+          }
+        }
+        open = now;
+      }).observe(scr, { attributes: true, attributeFilter: ['class'] });
+    }
+    let last = '';
+    setInterval(() => {
+      const S = NS.Social, s = NS.DB && NS.DB.save;
+      if (!S || !S.room || !s) { last = ''; return; }
+      const key = S.room.id + '|' + s.partner + '|' + !!s.partnerShiny;
+      if (key === last) return;
+      const first = !last;
+      last = key;
+      if (!first) { try { S.refreshMember(); } catch (_) { /* offline */ } }
+    }, 700);
+  }
+  waitFor(() => NS && NS.DB && NS.Social && NS.Social.refreshMember && document.getElementById('upg-mon'), setupPartnerSync, 'partnerSync');
+
+  // ---- room code, kicking and "full" (main menu room panel)
+  function setupRoomCode() {
+    const S = NS.Social, bar = document.getElementById('psmod-roombar'), party = document.getElementById('psmod-party');
+    if (!S || !bar || bar.querySelector('[data-a="code"]')) return;
+    const top = bar.querySelector('.rb-top');
+    const codeBtn = document.createElement('button');
+    codeBtn.className = 'btn small'; codeBtn.dataset.a = 'code'; codeBtn.textContent = 'Room code';
+    top.insertBefore(codeBtn, top.querySelector('[data-a="leave"]'));
+    const panel = document.createElement('div');
+    panel.className = 'rb-code'; panel.hidden = true;
+    top.after(panel);
+    let shownFor = '';
+    const showCode = () => {
+      const room = S.room; if (!room) return;
+      shownFor = room.id;
+      const shown = /^\d{6}$/.test(room.id) ? room.id.slice(0, 3) + ' ' + room.id.slice(3) : room.id;
+      panel.innerHTML = `<div class="row2"><code translate="no"${/^\d{6}$/.test(room.id) ? ' class="short"' : ''}>${esc(shown)}</code><button class="btn small gold" data-c="copy">Copy code</button><button class="btn small" data-c="link">Copy link</button><button class="btn small ghost" data-c="hide">Hide</button></div>`;
+      panel.hidden = false;
+    };
+    const ask = () => {
+      panel.innerHTML = `<div class="warn">Anyone with this code can join your room, not just friends. Players connect straight to each other, so they can see your IP address (and you theirs). Only share it with people you trust, and hide it on stream when you don’t want more players.</div><div class="row2"><button class="btn small gold" data-c="ok">Show the code</button><button class="btn small ghost" data-c="hide">Cancel</button></div>`;
+      panel.hidden = false;
+    };
+    const copy = async (t, what) => {
+      try { await navigator.clipboard.writeText(t); sayUi(what + ' copied'); }
+      catch (_) { sayUi('Couldn’t copy: select the code and copy it'); }
+    };
+    bar.addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.a === 'code') { e.stopPropagation(); b.blur(); if (!panel.hidden) { panel.hidden = true; return; } if (load('codeAck', false)) showCode(); else ask(); return; }
+      const c = b.dataset.c; if (!c) return;
+      e.stopPropagation(); b.blur();
+      const room = S.room;
+      if (c === 'ok') { save('codeAck', true); showCode(); }
+      else if (c === 'hide') panel.hidden = true;
+      else if (c === 'copy' && room) copy(room.id, 'Room code');
+      else if (c === 'link' && room) copy(roomLink(room.id), 'Join link');
+    }, true);
+
+    // Kick (host): ✕ on a player's card; click twice. Removed players who come
+    // back by themselves are removed again (for this room).
+    const kicked = new Map();   // room id -> Set of uids
+    let armed = null, armedT = 0;
+    const removeMember = (id, uid) => { try { NS.DB.fb.rtdb.ref('rooms/' + id + '/m/' + uid).remove().catch(() => {}); } catch (_) { /* offline */ } };
+    if (party) party.addEventListener('click', (e) => {
+      const b = e.target.closest('.pm-x'); if (!b) return;
+      e.stopPropagation();
+      const room = S.room; if (!room || !room.isHost) return;
+      const uid = b.dataset.kick;
+      if (armed !== uid || Date.now() - armedT > 3000) {
+        armed = uid; armedT = Date.now();
+        party.querySelectorAll('.pm-x.armed').forEach((x) => { x.classList.remove('armed'); x.querySelector('span').textContent = 'Kick'; });
+        b.classList.add('armed'); b.querySelector('span').textContent = 'Sure?'; b.title = 'Click again to remove';
+        setTimeout(() => { if (b.isConnected && armed === uid && Date.now() - armedT >= 2900) { b.classList.remove('armed'); b.querySelector('span').textContent = 'Kick'; } }, 3000);
+        return;
+      }
+      armed = null;
+      if (!kicked.has(room.id)) kicked.set(room.id, new Set());
+      kicked.get(room.id).add(uid);
+      removeMember(room.id, uid);
+      const m = room.members.find((x) => x.uid === uid);
+      sayUi((m ? m.name : 'Player') + ' was removed from the room');
+    }, true);
+    const addKicks = () => {
+      const room = S.room;
+      if (!party || !room || !room.isHost) return;
+      for (const pm of party.querySelectorAll('.pm')) {
+        const uid = pm.dataset.uid;
+        if (!uid || uid === room.host || pm.querySelector('.pm-x')) continue;
+        const x = document.createElement('button');
+        x.className = 'pm-x'; x.dataset.kick = uid; x.innerHTML = '<i>✕</i><span>Kick</span>'; x.title = 'Remove from the room';
+        pm.appendChild(x);
+      }
+    };
+    if (party) new MutationObserver(addKicks).observe(party, { childList: true, subtree: true });
+
+    // Host: "full" while every place is taken (in the lobby only); removed players stay out.
+    let openRef = null, openId = '', openVal = null;
+    const watchOpen = (room) => {
+      const id = room && room.isHost ? room.id : '';
+      if (id === openId) return;
+      if (openRef) { try { openRef.off(); } catch (_) { /* gone */ } openRef = null; }
+      openId = id; openVal = null;
+      if (!id) return;
+      try { openRef = NS.DB.fb.rtdb.ref('rooms/' + id + '/open'); openRef.on('value', (sn) => { openVal = sn.val(); sync(); }, () => {}); } catch (_) { openRef = null; }
+    };
+    // Players: noticing you were removed.
+    let seenIn = '';
+    function sync() {
+      const room = S.room;
+      if (!room) { seenIn = ''; watchOpen(null); if (!panel.hidden) panel.hidden = true; return; }
+      if (shownFor && shownFor !== room.id && !panel.hidden) panel.hidden = true;
+      watchOpen(room);
+      const myUid = NS.DB.fb && NS.DB.fb.uid, ms = room.members || [];
+      if (!room.isHost && myUid) {
+        if (ms.some((m) => m.uid === myUid)) seenIn = room.id;
+        else if (seenIn === room.id && ms.length) {
+          seenIn = '';
+          (async () => { try { await S.leaveRoom(); } catch (_) { /* gone */ } try { NS.Net.close(); } catch (_) { /* closed */ } sayUi('You were removed from the room'); NS.MenuUI && NS.MenuUI.open(); })();
+          return;
+        }
+      }
+      if (!room.isHost) return;
+      const ks = kicked.get(room.id);
+      if (ks) for (const m of ms) if (ks.has(m.uid)) removeMember(room.id, m.uid);
+      const inRun = (NS.Coop && NS.Coop.active) || (NS.Game && NS.Game.state && NS.Game.state !== 'ui');
+      if (inRun || openVal === null) return;
+      const max = S.MAX_PLAYERS || GAME_MAX, n = ms.filter((m) => !(ks && ks.has(m.uid))).length;
+      const ref = NS.DB.fb.rtdb.ref('rooms/' + room.id + '/open');
+      if (openVal === true && n >= max) ref.set('full').catch(() => {});
+      else if (openVal === 'full' && n < max) ref.set(true).catch(() => {});
+    }
+    S.on(() => { try { sync(); addKicks(); } catch (err) { trip('roomCode', err); } });
+    setInterval(() => { try { sync(); } catch (_) { /* offline */ } }, 2000);
+  }
+  waitFor(() => NS && NS.Social && NS.Social.on && document.getElementById('psmod-roombar') && NS.DB, setupRoomCode, 'roomCode');
+
+  // ---- join links: pokesurvivor.com/#join=CODE
+  (function joinLinks() {
+    const take = () => {
+      const id = roomFromText(location.hash);
+      if (!id) return null;
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (_) { /* keep it */ }
+      return id;
+    };
+    const ask = (id) => {
+      if (document.getElementById('psmod-joinask')) return;
+      const d = document.createElement('div');
+      d.id = 'psmod-joinask';
+      d.innerHTML = `<div class="box"><h3>Join a room?</h3><p>You opened a room link. Players connect straight to each other, so the room’s host will be able to see your IP address. Only join rooms from people you trust.</p><div class="row" style="justify-content:center;gap:8px"><button class="btn gold" data-j="yes">Join</button><button class="btn ghost" data-j="no">Not now</button></div></div>`;
+      document.body.appendChild(d);
+      d.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-j]'); if (!b) return;
+        d.remove();
+        if (b.dataset.j === 'yes') joinById(id);
+      });
+    };
+    const go = (id) => {
+      if (!id) return;
+      const t0 = Date.now();
+      const tick = () => {
+        const S = NS && NS.Social, DB = NS && NS.DB;
+        if (S && S.me && S.started) { ask(id); return; }
+        if (DB && DB.save && !DB.online && Date.now() - t0 > 8000) { sayUi('Log in with an account to join a room'); return; }
+        // Online but no nickname yet: the friends screen asks for one.
+        if (DB && DB.online && S && !S.started && Date.now() - t0 > 6000) { try { NS.FriendsUI.open(); } catch (_) { /* later */ } }
+        if (Date.now() - t0 < 60000) setTimeout(tick, 1000);
+      };
+      tick();
+    };
+    go(take());
+    addEventListener('hashchange', () => go(take()));
+  })();
 
   // ------------------------------------------------ splash text
   // Under the logo, instead of "Mystery Dungeon": one of these, picked each
@@ -7905,6 +8755,223 @@ html.psmod-calm #psmod-plus{animation:none}`;
   waitFor(() => NS && NS.Net && NS.Net.on && NS.Coop && document.getElementById('scr-lobby'), setupCoopExtras);
 
 
+  // ------------------------------------------------------------ rooms of 5-8 players
+  // The game caps rooms at 4, but only in each player's browser (joining
+  // backs out when the room has more; inviting stops at 4): the server
+  // doesn't count. With PokeSurvivor Plus on the host and on players 5-8,
+  // rooms take up to 8. The host marks its entry in the room (psmax) so
+  // joiners know it's allowed; a player without the extension still backs
+  // out as the 5th, as in the game.
+  // Difficulty: up to 4 players the game's own scaling; each player past 4
+  // adds about half as much as before (spawns) and half (health), so 5 is a
+  // bit harder than 4 and 8 the hardest, without the game's curve running
+  // away (its formula would give 8 players ×6.25 spawns and ×3.1 health).
+  // Fairness: those runs are never registered with or sent to the
+  // leaderboard (the game's server only takes groups of 2-4 anyway), and
+  // best times (shown on your public profile) stay as they were.
+  const BIG_MAX = 8, GAME_MAX = 4;
+  let bigRooms = load('bigRooms', true);
+  let bigRun = null;               // { bestTime, bestGroupTime } while a run of 5+ is on
+  const BIG_COLORS = ['#ff9a3c', '#b48cff', '#3fe0c8', '#eef0ff'];   // players 5-8: orange, violet, teal, white
+  const bigRate4 = 3.25, bigHp4 = 1.9;
+  const bigRate = (n) => bigRate4 + 0.4 * (n - GAME_MAX);   // 5: 3.65 … 8: 4.85
+  const bigHp = (n) => bigHp4 + 0.15 * (n - GAME_MAX);       // 5: 2.05 … 8: 2.5
+  const coopSize = () => (NS.Coop && NS.Coop.active && NS.Coop.members ? NS.Coop.members.length : 0);
+  function syncBigRooms() {
+    const S = NS && NS.Social;
+    if (!S) return;
+    try { S.MAX_PLAYERS = bigRooms ? BIG_MAX : GAME_MAX; } catch (_) { /* read-only */ }
+    publishBigRooms();
+  }
+  // The host's entry in the room says how many players it takes.
+  let bigSent = '';
+  function publishBigRooms() {
+    const S = NS && NS.Social, fb = NS && NS.DB && NS.DB.fb, room = S && S.room;
+    if (!room || !room.isHost || !fb || !fb.rtdb || !fb.uid) return;
+    const want = bigRooms ? BIG_MAX : GAME_MAX, key = room.id + '|' + want;
+    const mine = room.members.find((m) => m.uid === fb.uid);
+    if (bigSent === key && mine && mine.psmax === want) return;
+    bigSent = key;
+    fb.rtdb.ref('rooms/' + room.id + '/m/' + fb.uid).update({ psmax: want }).catch(() => { bigSent = ''; });
+  }
+  function setupBigRooms() {
+    const S = NS.Social, C = NS.Coop;
+    // Four more colours for players 5-8 (the game's list is shared, so it grows in place).
+    if (C.COLORS && C.COLORS.length < BIG_MAX) for (const c of BIG_COLORS) if (C.COLORS.length < BIG_MAX) C.COLORS.push(c);
+    // Joining: the game writes your entry, counts the room's members and backs
+    // out above 4. While joining a room whose host takes 5-8, that count of
+    // the members comes back as 4 (only that one read, only while joining).
+    const viaBig = async (id, fn) => {
+      const fb = NS.DB.fb, db = fb && fb.rtdb;
+      if (!id || !db || typeof db.ref !== 'function') return fn();
+      let host = null;
+      try { db.goOnline(); host = (await db.ref('rooms/' + id + '/host').get()).val(); } catch (err) { console.warn('[psmod] rooms: host lookup', err && (err.code || err.message)); }
+      if (!host) return fn();
+      // A host with PokeSurvivor Plus marks its room "full" (instead of open)
+      // when every place is taken: say so without knocking on the door.
+      try { const o = (await db.ref('rooms/' + id + '/open').get()).val(); if (o === 'full' && !(NS.Social.room && NS.Social.room.id === id)) return { ok: false, error: 'The room is full.' }; } catch (_) { /* the game will say */ }
+      // Messages left for you in this room by an earlier try (a refused join
+      // still gets the host's connection offer): read first, they'd make the
+      // new connection fail and retry. Cleared before joining.
+      try {
+        const S0 = NS.Social, uid = fb.uid;
+        if (uid && !(S0.room && S0.room.id === id)) {
+          const q = await db.ref('rooms/' + id + '/q/' + uid).get();
+          const old = [];
+          if (q && typeof q.forEach === 'function') q.forEach((c) => { old.push(c.ref.remove().catch(() => {})); });
+          if (old.length) { await Promise.all(old); console.info('[psmod] rooms: cleared', old.length, 'old messages'); }
+        }
+      } catch (_) { /* nothing to clear, or not allowed */ }
+      const ref = db.ref, path = 'rooms/' + id + '/m';
+      let maxOf = GAME_MAX, seenN = 0, seenHost = false;   // what the host takes (read with the count)
+      db.ref = function (p) {
+        const r = ref.apply(this, arguments);
+        try {
+          if (p === path && r && typeof r.get === 'function') {
+            const get = r.get;
+            r.get = async function () {
+              const snap = await get.apply(this, arguments);
+              try {
+                const count = snap.numChildren;
+                snap.numChildren = function () {
+                  const n = count.apply(this, arguments);
+                  try {
+                    const h = this.child(host).val();
+                    seenN = n; seenHost = !!h;
+                    if (h && +h.psmax > GAME_MAX) maxOf = Math.min(BIG_MAX, +h.psmax);
+                    if (bigRooms && n > GAME_MAX && n <= BIG_MAX && h && +h.psmax >= n) return GAME_MAX;
+                  } catch (_) { /* the game's own count */ }
+                  return n;
+                };
+              } catch (err) { trip('bigRooms', err); }
+              return snap;
+            };
+          }
+        } catch (err) { trip('bigRooms', err); }
+        return r;
+      };
+      try {
+        const r = await fn();
+        // A room of 8 that's full: say 8, not the game's 4.
+        if (r && !r.ok && maxOf > GAME_MAX && /\(\D*4\)/.test(r.error || '')) r.error = r.error.replace(/4\)/, maxOf + ')');
+        // Refused at 4: say why (the host decides how many fit).
+        else if (r && !r.ok && seenN > GAME_MAX && /\(\D*4\)/.test(r.error || '')) {
+          console.warn('[psmod] rooms: refused,', seenN, 'members; host entry', seenHost ? 'without psmax' : 'missing');
+          r.error = 'The room is full (max 4): its host needs PokeSurvivor Plus 1.2 or later with “Rooms of up to 8 players” on (Settings → Extras → Co-op), then reopen the room.';
+        }
+        return r;
+      } finally { if (db.ref !== ref) db.ref = ref; }
+    };
+    const join = S.joinRoom;
+    S.joinRoom = function (id) {
+      const args = arguments;
+      return viaBig(id, () => join.apply(this, args));
+    };
+    // Accepting an invite joins from inside the game (not through joinRoom above).
+    const accept = S.acceptInvite;
+    if (accept) S.acceptInvite = function (from) {
+      const args = arguments;
+      const inv = (S.invites || []).find((v) => v.from === from);
+      return viaBig(inv && inv.room, () => accept.apply(this, args));
+    };
+    // Inviting: the game stops at 4 members; with 5-8 allowed it's shown fewer for that check.
+    const inv = S.invite;
+    S.invite = function () {
+      const room = S.room;
+      if (!bigRooms || !room || !room.isHost || !Array.isArray(room.members) || room.members.length < GAME_MAX || room.members.length >= BIG_MAX) return inv.apply(this, arguments);
+      const real = room.members, short = real.slice(0, GAME_MAX - 1);
+      room.members = short;
+      try { return inv.apply(this, arguments); } finally { if (room.members === short) room.members = real; }
+    };
+    // Difficulty past 4 players.
+    const rate = C.scaleRate, hp = C.scaleHp, xpf = C.xpFactor;
+    C.scaleRate = function (n) { return n > GAME_MAX ? bigRate(n) : rate.apply(this, arguments); };
+    C.scaleHp = function (n) { return n > GAME_MAX ? bigHp(n) : hp.apply(this, arguments); };
+    C.xpFactor = function () {
+      const f = xpf.apply(this, arguments), n = coopSize();
+      // The game shares experience as if spawns grew at its own rate: keep
+      // the same balance with the gentler rate above.
+      return n > GAME_MAX ? f * rate(n) / bigRate(n) : f;
+    };
+    // Start of a run of 5+: best times are put back at the end.
+    const begin = C.begin;
+    C.begin = function (cfg) {
+      const r = begin.apply(this, arguments);
+      try {
+        bigRun = null;
+        if (cfg && cfg.members && cfg.members.length > GAME_MAX) {
+          const st = (NS.DB.save && NS.DB.save.stats) || {};
+          bigRun = { n: cfg.members.length, bestTime: st.bestTime || 0, bestGroupTime: st.bestGroupTime || 0 };
+          toast(`${cfg.members.length}-player run`, '#b48cff', 'Not on the leaderboard; your best times stay as they are');
+        }
+      } catch (err) { trip('bigRooms', err); }
+      return r;
+    };
+    S.on(() => { try { publishBigRooms(); } catch (_) { /* offline */ } });
+    syncBigRooms();
+    // A run that ended some other way.
+    setInterval(() => { if (bigRun && NS.Game && NS.Game.state === 'ui') bigRun = null; }, 1000);
+  }
+  // Called where the game reads the end of a run (after it updated its stats).
+  function bigRunRestore() {
+    if (!bigRun) return;
+    const st = NS.DB && NS.DB.save && NS.DB.save.stats;
+    if (st) { st.bestTime = bigRun.bestTime; st.bestGroupTime = bigRun.bestGroupTime; }
+  }
+  waitFor(() => NS && NS.Social && NS.Social.joinRoom && NS.Social.invite && NS.Coop && NS.Coop.scaleRate && NS.Coop.begin && NS.DB, setupBigRooms);
+
+  // ---- co-op connection helpers (most useful in big rooms)
+  // More free STUN servers for the direct connection (the game asks only
+  // Google's): a second opinion when one is slow or blocked on someone's network.
+  try {
+    const RPC = window.RTCPeerConnection;
+    if (RPC && !RPC.__psm) {
+      const EXTRA = ['stun:stun.cloudflare.com:3478', 'stun:stun2.l.google.com:19302', 'stun:stun3.l.google.com:19302'];
+      const Wrapped = function (cfg, ...rest) {
+        try {
+          if (cfg && Array.isArray(cfg.iceServers) && cfg.iceServers.length && !cfg.iceServers.some((s) => [].concat(s.urls || []).some((u) => /^turns?:/.test(u)))) {
+            const have = new Set(cfg.iceServers.flatMap((s) => [].concat(s.urls || [])));
+            const add = EXTRA.filter((u) => !have.has(u));
+            if (add.length) cfg = Object.assign({}, cfg, { iceServers: cfg.iceServers.concat([{ urls: add }]) });
+          }
+        } catch (_) { /* as the game asked */ }
+        return new RPC(cfg, ...rest);
+      };
+      Wrapped.prototype = RPC.prototype;
+      Object.setPrototypeOf(Wrapped, RPC);
+      Wrapped.__psm = true;
+      window.RTCPeerConnection = Wrapped;
+    }
+  } catch (_) { /* leave WebRTC alone */ }
+  // The host sends each player the game's state 15 times a second. When a
+  // player's connection can't keep up, the data piles up in the browser and
+  // the connection can stall and drop: their next updates wait a little
+  // longer instead (events are never skipped, they just ride in the next one).
+  waitFor(() => NS && NS.Net && NS.Net.send && NS.Coop && NS.Coop.tick, function setupNetPace() {
+    const DC = window.RTCDataChannel && RTCDataChannel.prototype;
+    if (!DC || DC.send.__psm) return;
+    const chan = new Map();   // uid -> data channel
+    let to = null;
+    const dsend = DC.send;
+    DC.send = function () { if (to) chan.set(to, this); return dsend.apply(this, arguments); };
+    DC.send.__psm = true;
+    const Net = NS.Net, send = Net.send;
+    Net.send = function (uid) { to = uid; try { return send.apply(this, arguments); } finally { to = null; } };
+    const C = NS.Coop, tick = C.tick;
+    const FAST = 1 / 15;
+    C.tick = function () {
+      const r = tick.apply(this, arguments);
+      try {
+        if (C.isHost) for (const m of C.mates) {
+          if (!m.connected || Math.abs(m.flushT - FAST) > 1e-9) continue;   // not sent this frame
+          const dc = chan.get(m.uid), ba = dc && dc.readyState === 'open' ? dc.bufferedAmount : 0;
+          if (ba > 256e3) m.flushT = 0.5; else if (ba > 64e3) m.flushT = 0.25; else if (ba > 16e3) m.flushT = 0.12;
+        }
+      } catch (err) { trip('netPace', err); }
+      return r;
+    };
+  }, 'netPace');
+
   // ------------------------------------------------------------ endless mode
   // The purple Endless button under Play starts an endless run (the gold Play
   // button, a normal one). Arceus's Judgment doesn't come at 30:00: the run
@@ -8013,10 +9080,11 @@ html.psmod-calm #psmod-plus{animation:none}`;
       endlessNext = 0;
       if (want) { startEndless(true); return null; }
       if (endlessRun) endEndless();
+      if (coopSize() > GAME_MAX) return null;      // 5-8 players: not registered either
       return started.apply(this, arguments);
     };
     R.submitSolo = function () { if (endlessRun) return null; return solo.apply(this, arguments); };
-    R.submitGroup = function () { if (endlessRun) return null; return group.apply(this, arguments); };
+    R.submitGroup = function (r) { if (endlessRun || bigRun || (r && r.members && r.members.length > GAME_MAX)) return null; return group.apply(this, arguments); };
     // No Judgment at 30:00 (unless Arceus is summoned).
     const upd = J.update;
     J.update = function (dt, pl, time) {
@@ -8026,7 +9094,12 @@ html.psmod-calm #psmod-plus{animation:none}`;
     // The game reads this right after updating its stats at the end of a run:
     // they go back to how they were before it started.
     const sum = J.summary;
-    J.summary = function () { const r = sum.apply(this, arguments); if (endlessRun) try { endlessRestore(false); } catch (err) { trip('endless', err); } return r; };
+    J.summary = function () {
+      const r = sum.apply(this, arguments);
+      if (endlessRun) try { endlessRestore(false); } catch (err) { trip('endless', err); }
+      try { bigRunRestore(); } catch (err) { trip('bigRooms', err); }
+      return r;
+    };
     // The old "extra time" curve from minute 60 (enemies, bosses and rift legendaries).
     const sc = E.scale, bsc = E.bossScale;
     const late = (o, t) => { if (!endlessRun) return o; const k = lateK(t); return k === 1 ? o : Object.assign({}, o, { hp: o.hp * k, dmg: o.dmg * Math.pow(k, 0.7) }); };
@@ -8083,29 +9156,28 @@ html.psmod-calm #psmod-plus{animation:none}`;
 
   // ---- the switch, the pause menu and the end of the run
   let endlessBtn = null, endlessClicking = false;
-  // A smooth, rounded infinity sign for the Endless button (drawn once).
+  // A pixel-art infinity sign for the Endless button, in the style of the
+  // game's 16 px menu icons (drawn once).
   let infIconUrl = '';
+  const INF_ART = [
+    '................', '................', '................', '................',
+    '..oooo....oooo..',
+    '.ohhhho..ohhhho.',
+    'ohwoowhoohwoowho',
+    'owo..owwwwo..owo',
+    'owo..owwwwo..owo',
+    'oso..oswwso..oso',
+    'ossoossoossoosso',
+    '.osssso..osssso.',
+    '..oooo....oooo..',
+    '................', '................', '................'];
+  const INF_PAL = { o: '#2a0f6b', w: '#efe6ff', h: '#ffffff', s: '#b9a2f2' };
   const INF_ICON = () => {
     if (infIconUrl) return infIconUrl;
     const cv = document.createElement('canvas');
-    cv.width = cv.height = 96;
+    cv.width = cv.height = 16;
     const g = cv.getContext('2d');
-    g.lineCap = g.lineJoin = 'round';
-    const path = () => {
-      g.beginPath();
-      for (let i = 0; i <= 160; i++) {
-        const t = (i / 160) * Math.PI * 2, d = 1 + Math.sin(t) ** 2;
-        const x = 48 + (37 * Math.cos(t)) / d, y = 48 + (46 * Math.sin(t) * Math.cos(t)) / d;
-        if (i) g.lineTo(x, y); else g.moveTo(x, y);
-      }
-      g.closePath();
-    };
-    path(); g.strokeStyle = '#2a0f6b'; g.lineWidth = 19; g.stroke();
-    path(); g.strokeStyle = '#efe6ff'; g.lineWidth = 10; g.stroke();
-    // A soft highlight along the top of each loop.
-    g.save(); g.beginPath(); g.rect(0, 0, 96, 44); g.clip();
-    path(); g.strokeStyle = '#ffffff'; g.lineWidth = 4; g.stroke();
-    g.restore();
+    INF_ART.forEach((row, y) => [...row].forEach((c, x) => { if (INF_PAL[c]) { g.fillStyle = INF_PAL[c]; g.fillRect(x, y, 1, 1); } }));
     return (infIconUrl = cv.toDataURL());
   };
   function setupEndlessUi() {
@@ -8119,7 +9191,7 @@ html.psmod-calm #psmod-plus{animation:none}`;
   box-shadow:0 0 0 3px #2a0f6b,0 6px 0 #2a0f6b,0 0 22px rgba(170,120,255,.45);transition:transform .08s,box-shadow .2s,filter .2s}
 #scr-menu #psmod-endless small{display:block;font-size:15px!important;margin-top:2px;color:#f1e9ff;font-weight:700;-webkit-text-stroke:0;text-shadow:1px 1px 0 #2a0f6b;
   white-space:normal;overflow:visible;padding-right:44px}
-#scr-menu #psmod-endless .mi-ico img{width:36px;height:36px;image-rendering:auto}
+#scr-menu #psmod-endless .mi-ico img{width:48px;height:48px;margin:-7px -8px;image-rendering:pixelated}
 #scr-menu #psmod-endless::before{filter:brightness(1.6)}
 #scr-menu #psmod-endless .psm-shine{position:absolute;top:-20%;bottom:-20%;width:38%;left:-50%;transform:skewX(-20deg);pointer-events:none;
   background:linear-gradient(90deg,transparent,rgba(240,225,255,.7),transparent)}
@@ -8149,7 +9221,7 @@ tr.run .psm-inf{color:#b89cff;font-weight:700;margin-left:4px}`;
       endlessBtn.id = 'psmod-endless';
       endlessBtn.className = 'menu-item psm-endless';
       endlessBtn.dataset.sfx = 'none';
-      endlessBtn.innerHTML = `<span class="mi-ico"><img src="${INF_ICON()}" width="24" height="24" alt="" draggable="false"></span><span class="psm-t">Endless</span><small></small><i class="psm-shine"></i><span class="psm-go" aria-hidden="true">›››</span>`;
+      endlessBtn.innerHTML = `<span class="mi-ico"><img class="pix" src="${INF_ICON()}" width="48" height="48" alt="" draggable="false"></span><span class="psm-t">Endless</span><small></small><i class="psm-shine"></i><span class="psm-go" aria-hidden="true">›››</span>`;
       play.after(endlessBtn);
       // Starts the run the Play button would, as an endless one.
       endlessBtn.addEventListener('click', (e) => {
@@ -9622,11 +10694,1022 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
   }
   waitFor(() => NS && NS.GachaUI && document.getElementById('pull-10b'), setupGachaLook);
 
+  // ------------------------------------------------ Spanish
+  // PokeSurvivor Plus is written in English. When the game is in Spanish
+  // (Settings → Accessibility → Language), its own words are translated the
+  // way the game translates itself into English: text in the page (and the
+  // HUD's canvas text) is looked up in this dictionary, exact phrases first,
+  // then phrases with gaps ({x}). Text the game writes in Spanish never
+  // matches, so it's left alone. What's new keeps its English history.
+  const PLUS_ES = {
+  " and move a little slower": " y se mueven un poco más despacio",
+  "(CC BY-NC 4.0), like the game’s sprites. Tier list:": "(CC BY-NC 4.0), como los sprites del juego. Tier list:",
+  "(CC BY-NC 4.0), like the game’s sprites. {x}.": "(CC BY-NC 4.0), como los sprites del juego. {x}.",
+  "(damage per second)": "(daño por segundo)",
+  "(kept apart: not on the leaderboard or in the totals above)": "(aparte: no cuentan para el ranking ni para los totales de arriba)",
+  "(non-standard layout: rebind below if buttons seem wrong)": "(distribución no estándar: reasigna abajo si los botones no cuadran)",
+  "+{x} health/s": "+{x} vida/s",
+  "A Pokémon joining your team, and shinies you got.": "Un Pokémon que se une a tu equipo y los shinies que consigues.",
+  "A line in the chat for each teammate’s ping (“Mira: Help!”).": "Una línea en el chat por cada aviso de un compañero («Mira: ¡Ayuda!»).",
+  "A line in the chat for each teammate’s ping.": "Una línea en el chat por cada aviso de un compañero.",
+  "A notice (and sparkle) when a shiny shows up, with where it is.": "Un aviso (y un destello) cuando aparece un shiny, con dónde está.",
+  "A notice when someone in co-op goes down.": "Un aviso cuando alguien cae en cooperativo.",
+  "A quick look at what it adds. Six cards, about thirty seconds. On a controller: A next, B skip.": "Un vistazo rápido a lo que añade. Seis tarjetas, unos treinta segundos. Con mando: A siguiente, B saltar.",
+  "A short sound for each ping, different for Help, Boss, Chest and Here.": "Un sonido corto para cada aviso, distinto para Ayuda, Jefe, Cofre y Aquí.",
+  "A short sound for each ping.": "Un sonido corto para cada aviso.",
+  "A short sound when you send a message.": "Un sonido corto al enviar un mensaje.",
+  "A soft red glow around the screen while your health is under 20%.": "Un brillo rojo suave alrededor de la pantalla mientras tu vida está por debajo del 20%.",
+  "A sparkle for shinies and a sound when a teammate goes down. Follows the effects volume above. Alt + B.": "Un destello para los shinies y un sonido cuando cae un compañero. Sigue el volumen de efectos de arriba. Alt + B.",
+  "ATK": "ATQ",
+  "Accessibility": "Accesibilidad",
+  "Achievement search": "Búsqueda de logros",
+  "Achievements": "Logros",
+  "Action": "Acción",
+  "Add to favourites (swap to it from the main menu)": "Añadir a favoritos (cámbiate a él desde el menú principal)",
+  "Alert sound": "Sonido de alerta",
+  "Alert sound off": "Sonido de alerta desactivado",
+  "Alert sound on": "Sonido de alerta activado",
+  "Alerts": "Alertas",
+  "All": "Todos",
+  "All maxed": "Todo al máximo",
+  "Altar power message": "Aviso de poder de altar",
+  "Altars": "Altares",
+  "Alternate": "Alternativa",
+  "Always on": "Siempre visible",
+  "Always show the damage panel": "Ver siempre el panel de daño",
+  "Always skip the slot machine animation": "Saltar siempre la animación de la tragaperras",
+  "Angry": "Enfadado",
+  "Anyone with this code can join your room, not just friends. Players connect straight to each other, so they can see your IP address (and you theirs). Only share it with people you trust, and hide it on stream when you don’t want more players.": "Cualquiera con este código puede entrar en tu sala, no sólo tus amigos. Los jugadores se conectan directamente entre sí, así que pueden ver tu dirección IP (y tú la suya). Compártelo sólo con gente de confianza, y ocúltalo en directo cuando no quieras más jugadores.",
+  "Apply to": "Aplicar a",
+  "Arceus has been summoned": "Has invocado a Arceus",
+  "Arceus is on the way…": "Arceus está en camino…",
+  "Arrow keys, the number pad and Esc keep working as in the game. Tab no longer cycles attacks.": "Las flechas, el teclado numérico y Esc siguen funcionando como en el juego. Tab ya no cambia de ataque.",
+  "Arrows and tags": "Flechas y etiquetas",
+  "Arrows and tags are part of the redesigned HUD; with the classic HUD the game draws its own.": "Las flechas y etiquetas son del HUD rediseñado; con el HUD clásico el juego dibuja las suyas.",
+  "Arrows at the screen edge pointing to teammates out of view.": "Flechas en el borde de la pantalla hacia los compañeros que no se ven.",
+  "Arrows pointing to bosses and legendaries out of view.": "Flechas hacia los jefes y legendarios que no se ven.",
+  "At": "A los",
+  "Attack": "Ataque",
+  "Attack 1 / upgrade 1": "Ataque 1 / mejora 1",
+  "Attack 2 / upgrade 2": "Ataque 2 / mejora 2",
+  "Attack 3 / upgrade 3": "Ataque 3 / mejora 3",
+  "Attack 4": "Ataque 4",
+  "Attack boost": "Aumento de ataque",
+  "Attack effect settings": "Ajustes de efectos de ataque",
+  "Attack effects": "Efectos de ataque",
+  "Audio percentages": "Porcentajes de audio",
+  "Axis": "Eje",
+  "Axis {x} {x}": "Eje {x} {x}",
+  "BEING REVIVED!": "¡TE ESTÁN LEVANTANDO!",
+  "BOSS": "JEFE",
+  "BOSS ·": "JEFE ·",
+  "Back": "Atrás",
+  "Backspace": "Retroceso",
+  "Backup": "Copia de seguridad",
+  "Banner with the most missing Pokémon": "Banner con más Pokémon que te faltan",
+  "Bars": "Barras",
+  "Base Game": "Juego base",
+  "Base stats": "Estadísticas base",
+  "Beam": "Rayo",
+  "Best damage/s": "Mejor daño/s",
+  "Best level": "Mejor nivel",
+  "Best time": "Mejor tiempo",
+  "Best time (co-op)": "Mejor tiempo (cooperativo)",
+  "Best time (solo)": "Mejor tiempo (solo)",
+  "Big chest meter": "Medidor del cofre grande",
+  "Biome and weather": "Bioma y clima",
+  "Blue": "Azul",
+  "Boomerang": "Bumerán",
+  "Boost": "Potenciador",
+  "Boost: {x} ({x}×)": "Potenciador: {x} ({x}×)",
+  "Boss": "Jefe",
+  "Boss Battle": "Combate de jefe",
+  "Boss arrows": "Flechas de jefes",
+  "Boss health percent": "Porcentaje de vida de los jefes",
+  "Boss health · colour": "Vida de los jefes · color",
+  "Bosses & legendaries": "Jefes y legendarios",
+  "Bosses after rifts": "Jefes tras las grietas",
+  "Bosses defeated": "Jefes derrotados",
+  "Bug": "Bicho",
+  "Burn": "Quemadura",
+  "Burns": "Quema",
+  "Button": "Botón",
+  "Button prompts": "Botones en pantalla",
+  "Buy {x} levels · {x}": "Comprar {x} niveles · {x}",
+  "Buys all {x} missing levels": "Compra los {x} niveles que faltan",
+  "By health": "Según la vida",
+  "COINS": "MONEDAS",
+  "Cancel": "Cancelar",
+  "Can’t connect to everyone yet: retrying": "Aún no se puede conectar con todos: reintentando",
+  "Can’t connect to {x} · retrying": "No se puede conectar con {x} · reintentando",
+  "Caps Lock": "Bloq Mayús",
+  "Cave": "Cueva",
+  "Chain": "Cadena",
+  "Change upgrade": "Cambiar mejoras",
+  "Change your level-up card in co-op": "Cambiar la carta de nivel en cooperativo",
+  "Changes": "Cambios",
+  "Changes to the game and to PokeSurvivor Plus. That’s it, have fun!": "Los cambios del juego y de PokeSurvivor Plus. ¡Eso es todo, a disfrutar!",
+  "Chat during runs": "Chat en las partidas",
+  "Chat needs the host to have PokeSurvivor Plus too.": "El chat necesita que el anfitrión también tenga PokeSurvivor Plus.",
+  "Chat over heads": "Chat sobre las cabezas",
+  "Chat sound": "Sonido del chat",
+  "Chat works when the host also has PokeSurvivor Plus.": "El chat funciona si el anfitrión también tiene PokeSurvivor Plus.",
+  "Chest": "Cofre",
+  "Chests": "Cofres",
+  "Choose": "Elegir",
+  "Choose your card": "Elige tu carta",
+  "Classic": "Clásico",
+  "Classic: the game’s own HUD": "Clásico: el HUD del juego",
+  "Clear history": "Borrar historial",
+  "Click a binding, then press a key, scroll the wheel, press a middle/side mouse button, or press a controller button / push a stick. Esc cancels, Backspace clears.": "Haz clic en una asignación y pulsa una tecla, gira la rueda, pulsa un botón central/lateral del ratón, o pulsa un botón / mueve un stick del mando. Esc cancela, Retroceso borra.",
+  "Click a run to see it above; ✕ removes it. ★ is your best damage per second. Runs are saved in this browser (the last {x}). Alt + H opens this anytime.": "Haz clic en una partida para verla arriba; ✕ la quita. ★ es tu mejor daño por segundo. Las partidas se guardan en este navegador (las últimas {x}). Alt + H abre esto cuando quieras.",
+  "Click again to remove": "Haz clic otra vez para echarlo",
+  "Click for another one": "Haz clic para ver otra",
+  "Click to see damage by attack": "Haz clic para ver el daño por ataque",
+  "Click to show or hide each kind of marker.": "Haz clic para mostrar u ocultar cada tipo de marca.",
+  "Close": "Cerrar",
+  "Closing the game…": "Cerrando el juego…",
+  "Co-op": "Cooperativo",
+  "Co-op connection pacing": "Ritmo de la conexión en cooperativo",
+  "Co-op pause and chat": "Pausa y chat del cooperativo",
+  "Co-op pause lines and the Arceus warning always show.": "Las pausas del cooperativo y el aviso de Arceus siempre se ven.",
+  "Co-op pings": "Avisos del cooperativo",
+  "Co-op pings (drawing)": "Avisos del cooperativo (dibujo)",
+  "Co-op · {x} players": "Cooperativo · {x} jugadores",
+  "Colour blind HUD layer": "Capa del HUD para daltonismo",
+  "Colour blind filter": "Filtro para daltonismo",
+  "Colour blind mode": "Modo daltónico",
+  "Colour correction": "Corrección de color",
+  "Complete": "Completo",
+  "Cone": "Cono",
+  "Confirm? {x}": "¿Confirmar? {x}",
+  "Connected:": "Conectado:",
+  "Connecting to {x}…": "Conectando con {x}…",
+  "Connection": "Conexión",
+  "Connection log": "Registro de conexión",
+  "Connection lost with {x}": "Conexión perdida con {x}",
+  "Connection with {x} dropped ({x}). Waiting for it to return.": "Se ha cortado la conexión con {x} ({x}). Esperando a que vuelva.",
+  "Connection with {x} restored": "Conexión con {x} recuperada",
+  "Connection with {x} restored.": "Conexión con {x} recuperada.",
+  "Controller": "Mando",
+  "Controller button prompts": "Botones del mando en pantalla",
+  "Controller connected": "Mando conectado",
+  "Controller connected and disconnected.": "Mando conectado y desconectado.",
+  "Controller disconnected": "Mando desconectado",
+  "Controller support": "Soporte de mando",
+  "Controller support is off.": "El soporte de mando está desactivado.",
+  "Cooldown": "Recarga",
+  "Cooldown{x}": "Recarga{x}",
+  "Copied! Paste it with Ctrl + V.": "¡Copiada! Pégala con Ctrl + V.",
+  "Copy code": "Copiar código",
+  "Copy image": "Copiar imagen",
+  "Copy it and paste it in your chat, or save it as a picture.": "Cópiala y pégala en tu chat, o guárdala como imagen.",
+  "Copy link": "Copiar enlace",
+  "Could not restore the connection with {x}": "No se pudo recuperar la conexión con {x}",
+  "Could not restore the connection with {x} ({x}).": "No se pudo recuperar la conexión con {x} ({x}).",
+  "Couldn’t be reached{x}.": "No se pudo contactar{x}.",
+  "Couldn’t close the tab: close it from your browser": "No se pudo cerrar la pestaña: ciérrala desde el navegador",
+  "Couldn’t copy: select the code and copy it": "No se pudo copiar: selecciona el código y cópialo",
+  "Couldn’t create the room.": "No se pudo crear la sala.",
+  "Couldn’t import that file": "No se pudo importar ese archivo",
+  "Couldn’t join the room.": "No se pudo entrar en la sala.",
+  "Couldn’t load the tier list": "No se pudo cargar la tier list",
+  "Couldn’t send the invite ({x}).": "No se pudo enviar la invitación ({x}).",
+  "Couldn’t send the invite.": "No se pudo enviar la invitación.",
+  "Count": "Cantidad",
+  "Create room": "Crear sala",
+  "Credits: HUD portraits from": "Créditos: retratos del HUD de",
+  "Crits (×1.5)": "Críticos (×1,5)",
+  "Crying": "Llorando",
+  "Cyan": "Cian",
+  "D-pad ←": "Cruceta ←",
+  "D-pad ↑": "Cruceta ↑",
+  "D-pad →": "Cruceta →",
+  "D-pad ↓": "Cruceta ↓",
+  "DAMAGE": "DAÑO",
+  "DAMAGE PER SECOND": "DAÑO POR SEGUNDO",
+  "DAMAGE/S": "DAÑO/S",
+  "DEFEATED": "DERROTADOS",
+  "DOWN": "CAÍDO",
+  "Damage": "Daño",
+  "Damage meter and co-op data": "Medidor de daño y datos del cooperativo",
+  "Damage over time": "Daño a lo largo de la partida",
+  "Damage panel": "Panel de daño",
+  "Damage panel (hold)": "Panel de daño (mantener)",
+  "Damage panel key": "Tecla del panel de daño",
+  "Damage per attack": "Daño por ataque",
+  "Damage per player and per attack, plus your upgrades. Shown with Tab (see Controls). Alt + M turns it off.": "Daño por jugador y por ataque, y tus mejoras. Se ve con Tab (ver Controles). Alt + M lo apaga.",
+  "Damage reduction{x}": "Reducción de daño{x}",
+  "Damage/s": "Daño/s",
+  "Damage{x}": "Daño{x}",
+  "Dark": "Siniestro",
+  "Dash": "Embestida",
+  "Date": "Fecha",
+  "Debug view": "Vista de depuración",
+  "Default": "Por defecto",
+  "Default view": "Vista por defecto",
+  "Defeat the legendary": "Vence al legendario",
+  "Defeated": "Derrotados",
+  "Defence boost": "Aumento de defensa",
+  "Delete": "Supr",
+  "Determined": "Decidido",
+  "Deuteranopia (green)": "Deuteranopía (verde)",
+  "Dizzy": "Mareado",
+  "Dmg/s": "Daño/s",
+  "Done": "Hecho",
+  "Down": "Caído",
+  "Down — go revive them": "Caído: ve a levantarlo",
+  "Drag to move · drag a corner to resize": "Arrastra para moverlo · arrastra una esquina para cambiar el tamaño",
+  "Drag to move · the game’s FPS setting (Settings → Graphics) turns it off": "Arrastra para moverlo · el ajuste de FPS del juego (Ajustes → Gráficos) lo apaga",
+  "Dragon": "Dragón",
+  "Duration": "Duración",
+  "During a run": "Durante la partida",
+  "ENRAGED": "FURIOSO",
+  "EVERYONE IS DOWN": "HABÉIS CAÍDO TODOS",
+  "Each stack": "Por acumulación",
+  "Effect": "Efecto",
+  "Electric": "Eléctrico",
+  "Endless": "Infinito",
+  "Endless mode": "Modo infinito",
+  "Endless run: Arceus’s Judgment doesn’t come at 30:00 and enemies keep getting tougher. Not on the leaderboard, no achievements, your game stats stay as they were; coins and tickets as usual.": "Partida infinita: la Sentencia de Arceus no llega a los 30:00 y los enemigos se hacen cada vez más duros. No va al ranking ni da logros, tus estadísticas no cambian; monedas y tickets como siempre.",
+  "Endless runs": "Partidas infinitas",
+  "Endless: from minute 60 they toughen faster as time goes on": "Infinito: desde el minuto 60 se endurecen cada vez más rápido",
+  "Ends the run with Arceus’s Judgment. Still not on the leaderboard.": "Acaba la partida con la Sentencia de Arceus. Sigue sin ir al ranking.",
+  "Enemies": "Enemigos",
+  "Enemy health": "Vida de los enemigos",
+  "Enemy hitboxes": "Hitboxes de enemigos",
+  "Enemy spawn rate": "Aparición de enemigos",
+  "Enter sends · Esc closes": "Intro envía · Esc cierra",
+  "Entering and leaving a rift, its legendary, and Pokémon joining Arceus’s Judgment.": "Entrar y salir de una grieta, su legendario y los Pokémon que acuden a la Sentencia de Arceus.",
+  "Equal": "Igual",
+  "Event banner filter": "Filtro de avisos de eventos",
+  "Events": "Eventos",
+  "Everything is in the game’s Settings: new HUD & UI, Accessibility and Extras tabs, with live previews of each change.": "Todo está en los Ajustes del juego: nuevas pestañas HUD e interfaz, Accesibilidad y Extras, con vista previa de cada cambio.",
+  "Everything is working with this version of the game.": "Todo funciona con esta versión del juego.",
+  "Experience bar size": "Tamaño de la barra de experiencia",
+  "Experience gained": "Experiencia ganada",
+  "Experience · colour": "Experiencia · color",
+  "Experience{x}": "Experiencia{x}",
+  "Export": "Exportar",
+  "Export settings": "Exportar ajustes",
+  "FPS counter": "Contador de FPS",
+  "Face the Judgment of Arceus": "Enfréntate a la Sentencia de Arceus",
+  "Fairy": "Hada",
+  "Faster gacha": "Gacha más rápido",
+  "Faster movement": "Te mueves más rápido",
+  "Favourite": "Favorito",
+  "Favourite Pokémon": "Pokémon favoritos",
+  "Favourite · click to remove": "Favorito · haz clic para quitarlo",
+  "Favourites": "Favoritos",
+  "Favourites on the menu": "Favoritos en el menú",
+  "Fewer PokeSurvivor Plus animations": "Menos animaciones de PokeSurvivor Plus",
+  "Field of view": "Campo de visión",
+  "Fighting": "Lucha",
+  "Finish your run first": "Termina antes tu partida",
+  "Fire": "Fuego",
+  "Fixes": "Arreglos",
+  "Flat": "Plano",
+  "Flying": "Volador",
+  "For every bar in the new HUD.": "Para todas las barras del HUD nuevo.",
+  "Forest": "Bosque",
+  "Frames per second in a small box you can drag anywhere (the game’s FPS setting, in Graphics).": "Fotogramas por segundo en una cajita que puedes llevar a cualquier sitio (el ajuste de FPS del juego, en Gráficos).",
+  "Friend search": "Búsqueda de amigos",
+  "Friends and rooms": "Amigos y salas",
+  "From an altar · lasts {x} s": "De un altar · dura {x} s",
+  "Fury": "Furia",
+  "Gacha buttons": "Botones del gacha",
+  "Game parts it uses were not found": "No se encontraron partes del juego que usa",
+  "Ghost": "Fantasma",
+  "Golden & thieves": "Dorados y ladrones",
+  "Gradient": "Degradado",
+  "Grass": "Planta",
+  "Green": "Verde",
+  "Ground": "Tierra",
+  "Guaranteed legendary in": "Legendario garantizado en",
+  "Guest mode: progress isn’t saved.": "Modo invitado: el progreso no se guarda.",
+  "Guide": "Guía",
+  "HP": "PS",
+  "HUD & UI": "HUD e interfaz",
+  "HUD size": "Tamaño del HUD",
+  "HUD size {x}x": "Tamaño del HUD {x}x",
+  "HUD style": "Estilo del HUD",
+  "HUD tooltips": "Descripciones del HUD",
+  "Hang on, almost there…": "Aguanta, ya casi…",
+  "Haste": "Prisa",
+  "Heal": "Cura",
+  "Healing puddles": "Charcos curativos",
+  "Health": "Vida",
+  "Health / max": "Vida / máx.",
+  "Health back over time": "Recuperas vida con el tiempo",
+  "Health bar size": "Tamaño de la barra de vida",
+  "Health, attacks, teammates and arrows.": "Vida, ataques, compañeros y flechas.",
+  "Held items, altar powers, healing springs and move bonds.": "Objetos equipados, poderes de altar, manantiales curativos y vínculos de movimientos.",
+  "Help": "Ayuda",
+  "Help!": "¡Ayuda!",
+  "Here": "Aquí",
+  "Hide": "Ocultar",
+  "Hide tier letters": "Ocultar letras de tier",
+  "Highest level": "Nivel más alto",
+  "Hold G (R3 on a controller) for a wheel: Help, Boss, Chest, Here. Shown to teammates with PokeSurvivor Plus.": "Mantén G (R3 en el mando) para una rueda: Ayuda, Jefe, Cofre, Aquí. Lo ven los compañeros con PokeSurvivor Plus.",
+  "Hold Tab for the damage panel; the minimap sits top-right. In co-op: hold G (R3) to ping, Enter to chat, and pause for everyone from the pause menu.": "Mantén Tab para el panel de daño; el minimapa está arriba a la derecha. En cooperativo: mantén G (R3) para avisar, Intro para el chat, y pausa para todos desde el menú de pausa.",
+  "Hold to show": "Mantener para ver",
+  "Hold to show the damage panel, or press once to show and again to hide.": "Mantén pulsado para ver el panel de daño, o pulsa una vez para verlo y otra para ocultarlo.",
+  "Home": "Inicio",
+  "Homing": "Teledirigido",
+  "Hordes, golden hour, lost Pokémon and treasure thieves.": "Hordas, hora dorada, Pokémon perdidos y ladrones de tesoros.",
+  "Hover a move to see what it does.": "Pasa el ratón por un movimiento para ver qué hace.",
+  "How far confusable colours are pushed apart. Reset is the tuned amount; go higher if some still look alike.": "Cuánto se separan los colores que se confunden. Restablecer deja el valor ajustado; súbelo si algunos aún se parecen.",
+  "Ice": "Hielo",
+  "If you get kicked from a game, open this (Alt + L) and check the last line: it says whether it was your connection to each other, the internet, or the browser.": "Si te echan de una partida, abre esto (Alt + L) y mira la última línea: dice si fue la conexión entre vosotros, internet o el navegador.",
+  "Import settings": "Importar ajustes",
+  "Import…": "Importar…",
+  "In a co-op run": "En una partida en grupo",
+  "In a lobby": "En una sala",
+  "In a run": "En una partida",
+  "In a solo run": "En una partida en solitario",
+  "In menus, the D-pad or left stick moves a yellow cursor, A selects and B goes back. The D-pad also moves you during a run.": "En los menús, la cruceta o el stick izquierdo mueven un cursor amarillo, A elige y B vuelve. La cruceta también te mueve en la partida.",
+  "In your room": "En tu sala",
+  "In {x}’s room · the host starts the run": "En la sala de {x} · el anfitrión empieza la partida",
+  "Internet connection lost.": "Conexión a internet perdida.",
+  "Internet connection restored.": "Conexión a internet recuperada.",
+  "Invite": "Invitar",
+  "Invite sent to {x}": "Invitación enviada a {x}",
+  "Item": "Objeto",
+  "Items": "Objetos",
+  "Items, powers and bonds": "Objetos, poderes y vínculos",
+  "Its starting move.": "Su movimiento inicial.",
+  "Join": "Unirme",
+  "Join a room?": "¿Entrar en una sala?",
+  "Join link copied": "Enlace copiado",
+  "Join room": "Entrar en la sala",
+  "Keep it on screen instead of using Tab.": "Siempre en pantalla, sin usar Tab.",
+  "Keep your selected attack": "Conservar el ataque elegido",
+  "Key": "Tecla",
+  "Key and button bindings": "Teclas y botones",
+  "Key binding": "Teclas",
+  "Kick": "Echar",
+  "Knockback": "Empuje",
+  "L-stick click": "Pulsar stick izq.",
+  "L-stick ←": "Stick izq. ←",
+  "L-stick ↑": "Stick izq. ↑",
+  "L-stick →": "Stick izq. →",
+  "L-stick ↓": "Stick izq. ↓",
+  "LEGENDARY": "LEGENDARIO",
+  "LEGENDARY ·": "LEGENDARIO ·",
+  "LEVEL": "NIVEL",
+  "LV {x} · {x}": "NV {x} · {x}",
+  "Language": "Idioma",
+  "Large": "Grande",
+  "Lasts": "Dura",
+  "Leaderboard": "Ranking",
+  "Leaderboard records": "Récords del ranking",
+  "Learnable moves list": "Lista de movimientos aprendibles",
+  "Leave room": "Salir de la sala",
+  "Leave this guest game (its progress isn’t saved)": "Salir de esta partida de invitado (su progreso no se guarda)",
+  "Leave your room first": "Sal antes de tu sala",
+  "Legendaries": "Legendarios",
+  "Less damage taken": "Recibes menos daño",
+  "Less shake and flashes": "Menos temblores y destellos",
+  "Level": "Nivel",
+  "Level and percent": "Nivel y porcentaje",
+  "Level {x} / {x}": "Nivel {x} / {x}",
+  "Level-up card details": "Detalles de las cartas de nivel",
+  "Level-up screen size": "Tamaño de la pantalla de nivel",
+  "Loading…": "Cargando…",
+  "Loads a file you exported. The page reloads to apply it.": "Carga un archivo que exportaste. La página se recarga para aplicarlo.",
+  "Log in with an account to join a room": "Entra con una cuenta para unirte a una sala",
+  "Log out": "Salir",
+  "Log out of this account (your progress is saved)": "Cerrar sesión en esta cuenta (tu progreso se guarda)",
+  "Log out? Guest progress is lost": "¿Salir? Se pierde el progreso de invitado",
+  "Longest run": "Partida más larga",
+  "Lost and restored connections with teammates, and no internet.": "Conexiones perdidas y recuperadas con los compañeros, y sin internet.",
+  "Low health glow": "Brillo de vida baja",
+  "Lv.": "Nv.",
+  "Lv. {x}": "Nv. {x}",
+  "Lv. {x} → {x}": "Nv. {x} → {x}",
+  "Lv. {x}/{x}": "Nv. {x}/{x}",
+  "Lvl.": "Nv.",
+  "Lvl. {x}": "Nv. {x}",
+  "MATE": "COMPA",
+  "Magnet": "Imán",
+  "Magnet{x}": "Imán{x}",
+  "Main menu splash text": "Frases del menú principal",
+  "Max all upgrades": "Mejorar todo al máximo",
+  "Max all · {x}": "Todo al máx. · {x}",
+  "Max stacks": "Acumulación máx.",
+  "Maxing needs {x} coins: this buys the {x} cheapest levels you can afford": "Mejorarlo todo cuesta {x} monedas: esto compra los {x} niveles más baratos que te puedes permitir",
+  "Melee": "Cuerpo a cuerpo",
+  "Menu": "Menú",
+  "Meowth and Gholdengo tags and arrows.": "Etiquetas y flechas de Meowth y Gholdengo.",
+  "Messages also show in a bubble over the Pokémon of whoever wrote them, for a few seconds.": "Los mensajes también salen unos segundos en un bocadillo sobre el Pokémon de quien los escribe.",
+  "Messages go to everyone in the room.": "Los mensajes llegan a todos los de la sala.",
+  "Messages in the middle of the screen": "Mensajes en el centro de la pantalla",
+  "Meteor": "Meteoro",
+  "Middle mouse": "Botón central",
+  "Mines": "Minas",
+  "Minimap": "Minimapa",
+  "Minimap shows": "El minimapa muestra",
+  "Minus": "Menos",
+  "Missing": "Me faltan",
+  "Missing by region ({x})": "Te faltan por región ({x})",
+  "Mode": "Modo",
+  "More damage": "Más daño",
+  "More music": "Más música",
+  "More music (playing)": "Más música (reproducción)",
+  "Most damage": "Más daño",
+  "Most defeated": "Más derrotados",
+  "Motion": "Movimiento",
+  "Mouse": "Ratón",
+  "Mouse back": "Ratón atrás",
+  "Mouse forward": "Ratón adelante",
+  "Move down": "Mover abajo",
+  "Move left": "Mover a la izquierda",
+  "Move right": "Mover a la derecha",
+  "Move up": "Mover arriba",
+  "Moves": "Movimientos",
+  "Moving": "En movimiento",
+  "Music": "Música",
+  "Name or #": "Nombre o nº",
+  "National": "Nacional",
+  "National Pokédex": "Pokédex Nacional",
+  "Needed game parts not found": "No se encontraron partes necesarias del juego",
+  "New": "Nuevo",
+  "New endless record!": "¡Nuevo récord infinito!",
+  "New move": "Movimiento nuevo",
+  "New record with {x}!": "¡Nuevo récord con {x}!",
+  "New records": "Nuevos récords",
+  "New tracks in the game’s style: five more for the menu, four more for each area, five more for boss fights, two more for Arceus’s Judgment, and three for each family of rift arenas, picked at random as you move between them.{x}": "Temas nuevos al estilo del juego: cinco más para el menú, cuatro más para cada zona, cinco más para los jefes, dos más para la Sentencia de Arceus y tres para cada familia de arenas de grieta, elegidos al azar al pasar de una a otra.{x}",
+  "Next": "Siguiente",
+  "Next attack": "Ataque siguiente",
+  "Next favourite:": "Favorito siguiente:",
+  "Next level: {x}": "Siguiente nivel: {x}",
+  "No Pokémon match \"{x}\" with these filters.": "Ningún Pokémon coincide con \"{x}\" con estos filtros.",
+  "No Pokémon match these filters.": "Ningún Pokémon con estos filtros.",
+  "No achievements found.": "No se han encontrado logros.",
+  "No controller detected. Plug it in or pair it, then press any button on it.": "No se detecta ningún mando. Conéctalo o emparéjalo y pulsa cualquier botón.",
+  "No data yet": "Aún no hay datos",
+  "No favourites here yet: open a Pokémon you own and press “Favourite”.": "Aún no hay favoritos: abre un Pokémon que tengas y pulsa «Favorito».",
+  "No favourites picked yet.": "Aún no ha elegido favoritos.",
+  "No internet connection": "Sin conexión a internet",
+  "No runs saved yet. A run is saved when it ends.": "Aún no hay partidas guardadas. Una partida se guarda al terminar.",
+  "No runs with it yet: your records will show here.": "Aún no hay partidas con él: tus récords saldrán aquí.",
+  "No shinies yet: shiny Pokémon come from the Gacha.": "Aún no tienes shinies: los Pokémon shiny salen del Gacha.",
+  "Not found in this version of the game": "No está en esta versión del juego",
+  "Not now": "Ahora no",
+  "Not on the leaderboard · no achievements · your best time is unchanged": "No va al ranking · sin logros · tu mejor tiempo no cambia",
+  "Not on the leaderboard · no achievements · your best time is unchanged{x}": "No va al ranking · sin logros · tu mejor tiempo no cambia{x}",
+  "Not on the leaderboard; your best times stay as they are": "No va al ranking; tus mejores tiempos no cambian",
+  "Nothing found.": "No se ha encontrado nada.",
+  "Nothing unusual has happened yet.": "Aún no ha pasado nada raro.",
+  "Notification settings": "Ajustes de notificaciones",
+  "Notifications": "Notificaciones",
+  "Now": "Ahora",
+  "Now playing": "Suena",
+  "Now playing: “{x}”.": "Suena: «{x}».",
+  "Numbers at level 1, with its attack.": "Valores a nivel 1, con su ataque.",
+  "Numbers on the experience bar": "Números en la barra de experiencia",
+  "Numbers on your health bar": "Números en tu barra de vida",
+  "OPEN!": "¡ABIERTO!",
+  "OPENING {x}%": "ABRIENDO {x}%",
+  "Off": "No",
+  "Offline": "Desconectado",
+  "Offline · last seen": "Desconectado · visto",
+  "On": "Sí",
+  "On PC": "En PC",
+  "Online": "En línea",
+  "Only how they look: hit areas don't change.": "Sólo cómo se ven: las zonas de golpe no cambian.",
+  "Only players with PokeSurvivor Plus see the chat.": "Sólo los jugadores con PokeSurvivor Plus ven el chat.",
+  "Only the host can start an endless run": "Sólo el anfitrión puede empezar una partida infinita",
+  "Only the host can summon Arceus.": "Sólo el anfitrión puede invocar a Arceus.",
+  "Only the interface (menus, windows and the HUD), or the Pokémon and the scene too.": "Sólo la interfaz (menús, ventanas y HUD), o también los Pokémon y el escenario.",
+  "Only your favourite Pokémon, from every region": "Sólo tus Pokémon favoritos, de todas las regiones",
+  "Options": "Opciones",
+  "Orange": "Naranja",
+  "Orbit": "Órbita",
+  "Orbs": "Orbes",
+  "Other": "Otros",
+  "Owned": "Tengo",
+  "PARTY": "GRUPO",
+  "POINT": "APUNTA",
+  "Pad": "Mando",
+  "Pain": "Dolor",
+  "Panels and messages": "Paneles y mensajes",
+  "Partner in Upgrades and the room": "Compañero en Mejoras y en la sala",
+  "Party levels": "Niveles del grupo",
+  "Party on the main menu": "Grupo en el menú principal",
+  "Pause": "Pausa",
+  "Pause during level-up": "Pausa al subir de nivel",
+  "Pause for everyone": "Pausa para todos",
+  "Pause menu and settings (the cards wait for you)": "Menú de pausa y ajustes (las cartas te esperan)",
+  "Pause · {x}": "Pausa · {x}",
+  "Paused by the host.": "En pausa por el anfitrión.",
+  "Paused by vote.": "En pausa por votación.",
+  "Paused for everyone": "En pausa para todos",
+  "Paused for everyone by vote.": "En pausa para todos por votación.",
+  "Paused: … is choosing": "En pausa: … está eligiendo",
+  "Pausing for everyone needs the host to have PokeSurvivor Plus.": "Pausar para todos necesita que el anfitrión tenga PokeSurvivor Plus.",
+  "Percent": "Porcentaje",
+  "Pierce": "Atraviesa",
+  "Ping (hold for wheel)": "Aviso (mantén para la rueda)",
+  "Ping sounds": "Sonidos de avisos",
+  "Pings": "Avisos",
+  "Pings in the chat": "Avisos en el chat",
+  "Pink": "Rosa",
+  "Play in a group, up to 8": "Juega en grupo, hasta 8",
+  "Play solo (leaves the room)": "Jugar solo (sales de la sala)",
+  "Player": "Jugador",
+  "Player colour": "Color del jugador",
+  "Player hitboxes": "Hitboxes de jugadores",
+  "Player profiles": "Perfiles de jugador",
+  "Poison": "Veneno",
+  "Poisons": "Envenena",
+  "PokeSurvivor Plus is on": "PokeSurvivor Plus está activo",
+  "PokeSurvivor Plus turned off {x} feature{x}": "PokeSurvivor Plus ha desactivado {x} función{x}",
+  "PokeSurvivor Plus {x}. Alt + K opens the Controls tab.": "PokeSurvivor Plus {x}. Alt + K abre la pestaña Controles.",
+  "Pokédex #": "Nº Pokédex",
+  "Pokémon caught": "Pokémon atrapados",
+  "Pokémon defeated": "Pokémon derrotados",
+  "Pokémon detail page": "Ficha del Pokémon",
+  "Pokémon move a little slower.": "Los Pokémon se mueven un poco más despacio.",
+  "Pokémon search, filters and favourites": "Búsqueda, filtros y favoritos de Pokémon",
+  "Pokémon sorting": "Orden de Pokémon",
+  "Pokémon that aren’t {x} slowly lose health{x}.": "Los Pokémon que no son {x} pierden vida poco a poco{x}.",
+  "Pop-ups": "Avisos",
+  "Press to toggle": "Pulsar para alternar",
+  "Press…": "Pulsa…",
+  "Previous attack": "Ataque anterior",
+  "Previous favourite:": "Favorito anterior:",
+  "Projectile": "Proyectil",
+  "Protanopia (red)": "Protanopía (rojo)",
+  "Psychic": "Psíquico",
+  "Purple": "Morado",
+  "Quit the game": "Salir del juego",
+  "Quit the game (closes this tab)": "Salir del juego (cierra esta pestaña)",
+  "R-stick click": "Pulsar stick der.",
+  "R-stick ←": "Stick der. ←",
+  "R-stick ↑": "Stick der. ↑",
+  "R-stick →": "Stick der. →",
+  "R-stick ↓": "Stick der. ↓",
+  "RELEASE": "SUELTA",
+  "REVIVING": "LEVANTANDO",
+  "RIFT ARENA": "ARENA DE LA GRIETA",
+  "RIFT OPEN": "GRIETA ABIERTA",
+  "RUN REPORT · {x}": "INFORME DE PARTIDA · {x}",
+  "Radius": "Radio",
+  "Rainbow": "Arcoíris",
+  "Rainbow and moving bars hold still, the logo stops glowing and previews stop moving.": "Las barras arcoíris y en movimiento se quedan quietas, el logo deja de brillar y las vistas previas se paran.",
+  "Range": "Alcance",
+  "Rank": "Puesto",
+  "Reconnecting… (up to {x} s)": "Reconectando… (hasta {x} s)",
+  "Records": "Récords",
+  "Red": "Rojo",
+  "Redesigned HUD": "HUD rediseñado",
+  "Redesigned HUD (drawing)": "HUD rediseñado (dibujo)",
+  "Regeneration": "Regeneración",
+  "Regeneration{x}": "Regeneración{x}",
+  "Region": "Región",
+  "Remove from the room": "Echar de la sala",
+  "Remove?": "¿Quitar?",
+  "Repertoire option": "Opción de Repertorio",
+  "Replay the welcome tour": "Repetir el recorrido de bienvenida",
+  "Reset": "Restablecer",
+  "Reset bars": "Restablecer barras",
+  "Reset bindings": "Restablecer teclas",
+  "Resume for everyone": "Seguir para todos",
+  "Resumes when the host says so or {x} of {x} players vote.": "Sigue cuando lo diga el anfitrión o voten {x} de {x} jugadores.",
+  "Rift": "Grieta",
+  "Rift · {x} m · {x}s": "Grieta · {x} m · {x}s",
+  "Rifts": "Grietas",
+  "Rifts and the Judgment": "Grietas y la Sentencia",
+  "Right Ctrl": "Ctrl der.",
+  "Right Shift": "Mayús der.",
+  "Rock": "Roca",
+  "Room code": "Código de sala",
+  "Room code copied": "Código de sala copiado",
+  "Room code or link": "Código o enlace de sala",
+  "Room codes": "Códigos de sala",
+  "Room on the main menu": "Sala en el menú principal",
+  "Rooms of up to 8 players": "Salas de hasta 8 jugadores",
+  "Rooms of up to 8 players · menu": "Salas de hasta 8 jugadores · menú",
+  "Rumble": "Vibración",
+  "Runs": "Partidas",
+  "Runs & records": "Partidas y récords",
+  "Runs, records and leaderboard": "Partidas, récords y ranking",
+  "S to D on the Pokémon screen and on each Pokémon’s page (also the “Tiers” button there). {x}.{x}": "De S a D en la pantalla de Pokémon y en la ficha de cada Pokémon (también con el botón «Tiers» de allí). {x}.{x}",
+  "SPE": "VEL",
+  "SPECTATING {x}{x}": "MIRANDO A {x}{x}",
+  "SPECTATING {x}{x}{x}": "MIRANDO A {x}{x}{x}",
+  "Sad": "Triste",
+  "Save image": "Guardar imagen",
+  "Saved as pokesurvivor-run.png in your downloads.": "Guardada como pokesurvivor-run.png en tus descargas.",
+  "Saves every PokeSurvivor Plus setting, binding, favourite, record and run to a file.": "Guarda en un archivo todos los ajustes, teclas, favoritos, récords y partidas de PokeSurvivor Plus.",
+  "Say something to the room…": "Di algo a la sala…",
+  "Screen view": "Vista de la pantalla",
+  "Search achievements": "Buscar logros",
+  "Search by name": "Buscar por nombre",
+  "Search friends": "Buscar amigos",
+  "Segmented": "Por segmentos",
+  "Select": "Elegir",
+  "Send": "Enviar",
+  "Settings": "Ajustes",
+  "Settings exported": "Ajustes exportados",
+  "Settings gear icon": "Icono de engranaje de Ajustes",
+  "Settings imported": "Ajustes importados",
+  "Settings search": "Búsqueda en Ajustes",
+  "Settings tabs": "Pestañas de Ajustes",
+  "Share": "Compartir",
+  "Share card": "Tarjeta para compartir",
+  "Shared between {x} players": "Repartida entre {x} jugadores",
+  "Shift": "Mayús",
+  "Shifts the game’s colours so the ones you have trouble with are easier to tell apart. The swatches below change with it.": "Cambia los colores del juego para que los que te cuesta distinguir se separen más. Las muestras de abajo cambian con él.",
+  "Shinies behind the menu": "Shinies tras el menú",
+  "Shiny appeared": "Ha aparecido un shiny",
+  "Shiny sound": "Sonido de shiny",
+  "Shiny! {x}": "¡Shiny! {x}",
+  "Shouting": "Gritando",
+  "Show": "Mostrar",
+  "Show FPS": "Mostrar FPS",
+  "Show pings from teammates (and the ping wheel). Also in Settings → Extras.": "Ver los avisos de los compañeros (y la rueda de avisos). También en Ajustes → Extras.",
+  "Show the code": "Ver el código",
+  "Show tier letters from the SurvivorTiers tier list by {x}": "Ver las letras de la tier list SurvivorTiers de {x}",
+  "Skip": "Saltar",
+  "Skip animation": "Saltar animación",
+  "Slash": "Barra",
+  "Slows": "Ralentiza",
+  "Small": "Pequeña",
+  "Solo run": "Partida en solitario",
+  "Sort: {x} · {x} ▾": "Orden: {x} · {x} ▾",
+  "Sound": "Sonido",
+  "Space": "Espacio",
+  "Spanish": "Español",
+  "Spectate while down": "Mirar mientras estás caído",
+  "Speed": "Velocidad",
+  "Speed boost": "Aumento de velocidad",
+  "Speed{x}": "Velocidad{x}",
+  "Sprite data": "Datos de sprites",
+  "Start": "Inicio",
+  "Start one with the purple": "Empieza una con el botón morado",
+  "Start the co-op run ({x}/{x})": "Empezar la partida en grupo ({x}/{x})",
+  "Start with one move even if Repertoire is owned": "Empezar con un solo movimiento aunque tengas Repertorio",
+  "Stats": "Estadísticas",
+  "Stats screen": "Pantalla de estadísticas",
+  "Stats, Quit and menu layout": "Estadísticas, Salir y diseño del menú",
+  "Status": "Estado",
+  "Steel": "Acero",
+  "Still choosing:": "Aún eligen:",
+  "Still connecting to your friends…": "Aún conectando con tus amigos…",
+  "Stopped after errors": "Parado tras varios errores",
+  "Stops enemies and the timer for every player.": "Para a los enemigos y el reloj de todos los jugadores.",
+  "Strength": "Intensidad",
+  "Stunned": "Aturdido",
+  "Style": "Estilo",
+  "Summon Arceus": "Invocar a Arceus",
+  "Summon Arceus? It ends the run": "¿Invocar a Arceus? Acaba la partida",
+  "Sure?": "¿Seguro?",
+  "Surprised": "Sorprendido",
+  "Swift": "Rapidez",
+  "TEAM": "EQUIPO",
+  "TEAM DAMAGE": "DAÑO DEL EQUIPO",
+  "TIME": "TIEMPO",
+  "Tab (Select on controller)": "Tab (Select en el mando)",
+  "Tabs": "Pestañas",
+  "Take back my vote": "Retirar mi voto",
+  "Take on an endless gauntlet of Pokémon": "Enfréntate a una oleada infinita de Pokémon",
+  "Tap the ★ on a Pokémon’s page, then swap between favourites here with ◀ ▶ (or Q / E, LB / RB).": "Pulsa la ★ en la ficha de un Pokémon y cambia entre favoritos aquí con ◀ ▶ (o Q / E, LB / RB).",
+  "Team average Learning": "Aprendizaje medio del equipo",
+  "Teammate arrows": "Flechas de compañeros",
+  "Teammate down": "Compañero caído",
+  "Teammate left": "Un compañero se va",
+  "Teammates": "Compañeros",
+  "Teammates’ attacks · opacity": "Ataques de los compañeros · opacidad",
+  "Teammates’ attacks · size": "Ataques de los compañeros · tamaño",
+  "Teammates’ health · colour": "Vida de los compañeros · color",
+  "Teary-Eyed": "Lloroso",
+  "Terrain": "Terreno",
+  "Test": "Probar",
+  "That doesn’t look like a room code": "Eso no parece un código de sala",
+  "That is why it reloaded. Press Alt + L to view the log": "Por eso se ha recargado. Pulsa Alt + L para ver el registro",
+  "That’s you": "Eres tú",
+  "The Judgment begins when you continue": "La Sentencia empieza al continuar",
+  "The arrow to an open rift, and the tag over its portal.": "La flecha hacia una grieta abierta y la etiqueta sobre su portal.",
+  "The biome’s name when you arrive, and weather changes.": "El nombre del bioma al llegar y los cambios de clima.",
+  "The browser discarded this tab to save memory and reloaded it.": "El navegador descartó esta pestaña para ahorrar memoria y la recargó.",
+  "The browser froze the tab (it was in the background).": "El navegador congeló la pestaña (estaba en segundo plano).",
+  "The browser had closed the tab to save memory": "El navegador cerró la pestaña para ahorrar memoria",
+  "The camera shakes less and flashes are softer (the game’s own setting).": "La cámara tiembla menos y los destellos son más suaves (ajuste del propio juego).",
+  "The game goes on.": "La partida sigue.",
+  "The game reloads when you change it.": "El juego se recarga al cambiarlo.",
+  "The game seems to have changed. The rest keeps working · Settings → Extras → Status": "El juego parece haber cambiado. El resto sigue funcionando · Ajustes → Extras → Estado",
+  "The game’s achievement pop-ups at the top of the screen.": "Los avisos de logros del juego arriba de la pantalla.",
+  "The game’s notice when a run gets a new best on the leaderboard.": "El aviso del juego cuando una partida consigue una nueva marca en el ranking.",
+  "The host paused the game for everyone.": "El anfitrión ha pausado la partida para todos.",
+  "The message box at the bottom left (Enter to write). The room chat always shows.": "La caja de mensajes abajo a la izquierda (Intro para escribir). El chat de la sala siempre se ve.",
+  "The redesigned HUD, or the game’s original one. Touch screens always use the original.": "El HUD rediseñado o el original del juego. Las pantallas táctiles siempre usan el original.",
+  "The room is full (max 4): its host needs PokeSurvivor Plus 1.3 with “Rooms of up to 8 players” on (Settings → Extras → Co-op), then reopen the room.": "La sala está llena (máximo 4): su anfitrión necesita PokeSurvivor Plus 1.3 con «Salas de hasta 8 jugadores» activado (Ajustes → Extras → Cooperativo) y volver a abrir la sala.",
+  "The room is full.": "La sala está llena.",
+  "The run ends if nobody gets up": "La partida acaba si nadie se levanta",
+  "The song’s name at the bottom right of the main menu when a new one starts.": "El nombre de la canción abajo a la derecha del menú principal cuando empieza una nueva.",
+  "The tab resumed after being frozen.": "La pestaña siguió tras estar congelada.",
+  "Thick": "Gruesa",
+  "Thief arrows": "Flechas de ladrones",
+  "Thin": "Fina",
+  "This player has no profile yet.": "Este jugador aún no tiene perfil.",
+  "Tier letters": "Letras de tier",
+  "Tier list letters": "Letras de la tier list",
+  "Time": "Tiempo",
+  "Top bar": "Barra superior",
+  "Top-right map of the area around you. Drag it to move it, drag a corner to resize. Alt + N.": "Mapa de tu zona arriba a la derecha. Arrástralo para moverlo y arrastra una esquina para cambiar el tamaño. Alt + N.",
+  "Totals": "Totales",
+  "Tour": "Recorrido",
+  "Trail": "Estela",
+  "Translation fixes": "Arreglos de traducción",
+  "Treasure thieves": "Ladrones de tesoros",
+  "Tritanopia (blue)": "Tritanopía (azul)",
+  "Turret": "Torreta",
+  "Twinkles, low health glow, faster co-op chests and revives": "Destellos, brillo de vida baja, cofres y reanimaciones más rápidos en grupo",
+  "UI and Pokémon / scene": "Interfaz y Pokémon / escenario",
+  "UI only": "Sólo la interfaz",
+  "Up to 8 players in a room when the host has PokeSurvivor Plus (players 5–8 need it too). Enemies scale up gently with each extra player. Runs with more than 4 players never go on the leaderboard and don’t change your best times.": "Hasta 8 jugadores en una sala si el anfitrión tiene PokeSurvivor Plus (los jugadores 5–8 también lo necesitan). Los enemigos se endurecen un poco con cada jugador de más. Las partidas de más de 4 jugadores nunca van al ranking ni cambian tus mejores tiempos.",
+  "Update": "Actualizar",
+  "Upgrade level {x} / {x}": "Nivel de mejoras {x} / {x}",
+  "Upgrades": "Mejoras",
+  "Upgrades layout and move shortcuts": "Diseño de Mejoras y atajos de movimientos",
+  "Upgrades search": "Búsqueda en Mejoras",
+  "Use all": "Usar todos",
+  "Use ×1": "Usar ×1",
+  "Use ×10": "Usar ×10",
+  "Use ×10 ticket": "Usar ticket ×10",
+  "Using the copy from {x}: couldn’t update.": "Usando la copia del {x}: no se pudo actualizar.",
+  "Version on the menu": "Versión en el menú",
+  "Vetoed: it won’t appear on your level-up cards.": "Vetado: no saldrá en tus cartas de nivel.",
+  "Vibrate when you take damage.": "Vibra cuando recibes daño.",
+  "View": "Vista",
+  "View my public profile": "Ver mi perfil público",
+  "Village Theme": "Tema del pueblo",
+  "Volcano": "Volcán",
+  "Volume": "Volumen",
+  "Vote to pause": "Votar pausa",
+  "Vote to resume": "Votar para seguir",
+  "Voted to go on: {x} ({x}/{x})": "Han votado seguir: {x} ({x}/{x})",
+  "Voted:": "Han votado:",
+  "Waiting for": "Esperando a",
+  "Waiting for a teammate…": "Esperando a un compañero…",
+  "Waiting for {x} to start": "Esperando a que {x} empiece",
+  "Waiting for {x} to start the run": "Esperando a que {x} empiece la partida",
+  "Watch a teammate while you wait to be revived (switch with previous / next attack). Full view when the host also has PokeSurvivor Plus.": "Mira a un compañero mientras esperas a que te levanten (cambia con ataque anterior / siguiente). Vista completa si el anfitrión también tiene PokeSurvivor Plus.",
+  "Water": "Agua",
+  "Welcome to PokeSurvivor Plus": "Bienvenido a PokeSurvivor Plus",
+  "Welcome tour": "Recorrido de bienvenida",
+  "What’s new": "Novedades",
+  "What’s new in PokeSurvivor Plus": "Novedades de PokeSurvivor Plus",
+  "Wheel down": "Rueda abajo",
+  "Wheel up": "Rueda arriba",
+  "When a run beats one of your Pokémon’s records.": "Cuando una partida bate un récord de uno de tus Pokémon.",
+  "When someone leaves the co-op run.": "Cuando alguien deja la partida en cooperativo.",
+  "Where enemies (red) and bosses (orange) can be hit. Off by default.": "Dónde se puede golpear a los enemigos (rojo) y a los jefes (naranja). Desactivado por defecto.",
+  "Where you (green) and teammates (blue) can be hit. Off by default.": "Dónde te pueden golpear a ti (verde) y a tus compañeros (azul). Desactivado por defecto.",
+  "Which buttons the prompts show. Auto reads the controller’s name; a Steam Deck through Steam Input may report itself as an Xbox pad, so pick Steam Deck here if so.": "Qué botones se muestran. Auto lee el nombre del mando; una Steam Deck con Steam Input puede presentarse como mando de Xbox: si es así, elige Steam Deck aquí.",
+  "White": "Blanco",
+  "Wild Pokémon and bosses": "Pokémon salvajes y jefes",
+  "Wild Pokémon grow stronger and stronger": "Los Pokémon salvajes se hacen cada vez más fuertes",
+  "Works the same for you, your teammates and the enemies.": "Funciona igual para ti, tus compañeros y los enemigos.",
+  "Worried": "Preocupado",
+  "XP {x} - magnet {x}": "EXP {x} - imán {x}",
+  "YOU": "TÚ",
+  "YOU'RE DOWN": "HAS CAÍDO",
+  "YOUR UPGRADES": "TUS MEJORAS",
+  "Yellow": "Amarillo",
+  "Yes": "Sí",
+  "You": "Tú",
+  "You and": "Tú y",
+  "You can change your card until everyone has chosen.": "Puedes cambiar tu carta hasta que todos hayan elegido.",
+  "You can only invite your friends.": "Sólo puedes invitar a tus amigos.",
+  "You have": "Tienes",
+  "You have not dealt any damage yet": "Aún no has hecho daño",
+  "You move 45% faster.": "Te mueves un 45% más rápido.",
+  "You opened a room link. Players connect straight to each other, so the room’s host will be able to see your IP address. Only join rooms from people you trust.": "Has abierto un enlace de sala. Los jugadores se conectan directamente entre sí, así que el anfitrión podrá ver tu dirección IP. Entra sólo en salas de gente de confianza.",
+  "You were removed from the room": "Te han echado de la sala",
+  "You ·": "Tú ·",
+  "Your attacks": "Tus ataques",
+  "Your attacks · opacity": "Tus ataques · opacidad",
+  "Your attacks · size": "Tus ataques · tamaño",
+  "Your best damage per second": "Tu mejor daño por segundo",
+  "Your browser didn’t allow copying images: use Save image instead.": "Tu navegador no deja copiar imágenes: usa Guardar imagen.",
+  "Your damage is doubled.": "Tu daño se duplica.",
+  "Your health · colour": "Tu vida · color",
+  "Your latest runs": "Tus últimas partidas",
+  "Your latest runs and the details of each (Alt + H)": "Tus últimas partidas y los detalles de cada una (Alt + H)",
+  "Your magnet reaches 4× as far: you pull in everything from afar.": "Tu imán llega 4 veces más lejos: atraes todo desde lejos.",
+  "Your moves recharge 40% faster.": "Tus movimientos se recargan un 40% más rápido.",
+  "Your room · invite friends to play together": "Tu sala · invita a tus amigos para jugar juntos",
+  "Your room · {x}/{x} ready": "Tu sala · {x}/{x} listos",
+  "Your runs, records and the leaderboard (Alt + H)": "Tus partidas, récords y el ranking (Alt + H)",
+  "Your totals, every run with a damage graph and a share card, personal records for each Pokémon, and the leaderboard.": "Tus totales, cada partida con su gráfica de daño y tarjeta para compartir, récords de cada Pokémon y el ranking.",
+  "Your view · {x}x": "Tu vista · {x}x",
+  "Your {x} Pokémon is affected: watch your health.": "Tu Pokémon {x} se ve afectado: vigila tu vida.",
+  "Your {x} Pokémon is safe from it.": "Tu Pokémon {x} no se ve afectado.",
+  "Yours and your teammates’.": "La tuya y la de tus compañeros.",
+  "You’re already in a room": "Ya estás en una sala",
+  "Zooms the camera out to show more of the map. Alt + / Alt − / Alt 0.": "Aleja la cámara para ver más mapa. Alt + / Alt − / Alt 0.",
+  "a file": "un archivo",
+  "a player": "un jugador",
+  "best damage/s": "mejor daño/s",
+  "best→worst": "mejor→peor",
+  "button under Play (the gold Play button starts a normal run). Arceus’s Judgment doesn’t come at 30:00: the run goes on like before the Judgment existed (from minute 60 enemies toughen faster and faster), rifts keep opening and a boss comes every 3 minutes. Summon Arceus from the pause menu to end it (the host, in co-op). Endless runs never go on the leaderboard, don’t unlock achievements and don’t change your game stats (best time, best level…); coins and tickets as usual. Their records are in Stats.": "bajo Jugar (el botón dorado Jugar empieza una partida normal). La Sentencia de Arceus no llega a los 30:00: la partida sigue como antes de que existiera (desde el minuto 60 los enemigos se hacen más duros cada vez más rápido), siguen abriéndose grietas y llega un jefe cada 3 minutos. Invoca a Arceus desde el menú de pausa para acabarla (el anfitrión, en cooperativo). Las partidas infinitas nunca van al ranking, no desbloquean logros ni cambian tus estadísticas del juego (mejor tiempo, mejor nivel…); monedas y tickets como siempre. Sus récords están en Estadísticas.",
+  "damage taken": "daño recibido",
+  "days ago": "días",
+  "everyone stops": "todos se paran",
+  "h ago": "h",
+  "highest level": "nivel más alto",
+  "high→low": "alto→bajo",
+  "less shake": "menos temblores",
+  "longest run": "partida más larga",
+  "low→high": "bajo→alto",
+  "min ago": "min",
+  "most damage": "más daño",
+  "most defeated": "más derrotados",
+  "needs help! ·": "¡necesita ayuda! ·",
+  "new best on the leaderboard": "nueva marca en el ranking",
+  "no mod": "sin mod",
+  "not a PokeSurvivor Plus settings file": "no es un archivo de ajustes de PokeSurvivor Plus",
+  "of {x} ·": "de {x} ·",
+  "slot {x}": "hueco {x}",
+  "survivortiers.pages.dev didn’t answer. Try again later.": "survivortiers.pages.dev no responde. Prueba más tarde.",
+  "the file is empty": "el archivo está vacío",
+  "the host": "el anfitrión",
+  "worst→best": "peor→mejor",
+  "x10 guarantees an epic": "x10 garantiza un épico",
+  "{x} CAUGHT!": "¡{x} ATRAPADO!",
+  "{x} Favourites": "{x} Favoritos",
+  "{x} GOT AWAY": "{x} SE ESCAPÓ",
+  "{x} Pokémon, updated {x}.": "{x} Pokémon, actualizada el {x}.",
+  "{x} attacks": "Ataques {x}",
+  "{x} can revive you · {x} m away": "{x} puede levantarte · a {x} m",
+  "{x} feature{x} turned off, most likely because the game was updated. Everything else keeps working; an update of PokeSurvivor Plus will bring {x} back.": "{x} función{x} desactivada{x}, seguramente porque el juego se ha actualizado. Todo lo demás sigue funcionando; una actualización de PokeSurvivor Plus {x} recuperará.",
+  "{x} from your boost moves.": "{x} de tus movimientos potenciadores.",
+  "{x} health/s": "{x} vida/s",
+  "{x} is down — go revive them": "{x} ha caído: ve a levantarlo",
+  "{x} it can learn · hover for details": "{x} que puede aprender · pasa el ratón para ver detalles",
+  "{x} items from {x} · reloading…": "{x} elementos de {x} · recargando…",
+  "{x} m away": "a {x} m",
+  "{x} power": "Poder {x}",
+  "{x} power · {x} s": "Poder {x} · {x} s",
+  "{x} pulls": "{x} tiradas",
+  "{x} s left": "quedan {x} s",
+  "{x} was removed from the room": "{x} ha salido de la sala",
+  "{x} {x} tiles away": "{x} a {x} casillas",
+  "{x} · +{x} upgrade level{x}": "{x} · +{x} nivel{x} de mejora",
+  "{x} · {x} · CATCH IT! · {x}s": "{x} · {x} · ¡ATRÁPALO! · {x}s",
+  "{x}-player run": "Partida de {x} jugadores",
+  "{x}Pauses for everyone when {x} of {x} players vote.": "{x}Se pausa para todos cuando votan {x} de {x} jugadores.",
+  "· LIMITED VIEW": "· VISTA LIMITADA",
+  "· co-op ({x})": "· cooperativo ({x})",
+  "· copy from {x} (couldn’t update)": "· copia del {x} (no se pudo actualizar)",
+  "· couldn’t be reached, try again later": "· no se pudo contactar, prueba más tarde",
+  "· loading…": "· cargando…",
+  "· one line per player, over the run": "· una línea por jugador, durante la partida",
+  "· over the run": "· durante la partida",
+  "· {x}/{x} TO SWITCH": "· {x}/{x} PARA CAMBIAR",
+  "×10 TICKET": "TICKET ×10",
+  "×10 ticket": "ticket ×10",
+  "×10 tickets": "tickets ×10",
+  "×{x} damage": "Daño ×{x}",
+  "“Wild … appeared!”, a shiny nearby, Pokémon tides and enraged bosses.": "«¡… salvaje apareció!», un shiny cerca, mareas de Pokémon y jefes furiosos.",
+  "… is choosing": "… está eligiendo",
+  "∞ ENDLESS": "∞ INFINITO",
+  "∞ Endless": "∞ Infinito",
+  "∞ Endless run": "∞ Partida infinita",
+  "★ NEW RECORD": "★ NUEVO RÉCORD",
+  "★ NEW RECORDS ·": "★ NUEVOS RÉCORDS ·",
+  "★ New record · {x}": "★ Nuevo récord · {x}",
+  "★ {x} favourites": "★ {x} favoritos",
+  "🎮 {x}": "🎮 {x}"
+  };
+  let plusEsT = (s) => s;
+  function setupPlusEs() {
+    if (!NS.I18n || NS.I18n.lang !== 'es' || plusEsT.__on) return;
+    const reEsc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const exact = new Map(), pats = [];
+    for (const [en, es] of Object.entries(PLUS_ES)) {
+      if (en.includes('{x}')) pats.push({ re: new RegExp('^' + en.split('{x}').map(reEsc).join('([\\s\\S]*?)') + '$'), es, n: en.replace(/\{x\}/g, '').length });
+      else exact.set(en, es);
+    }
+    pats.sort((a, b) => b.n - a.n);
+    const cache = new Map();
+    // What falls in a gap is translated too (a song name, "Menu"…).
+    const core = (body, depth = 0) => {
+      let r = exact.get(body);
+      if (r !== undefined) return r;
+      if (depth > 2) return undefined;
+      for (const p of pats) {
+        const m = p.re.exec(body);
+        if (!m) continue;
+        let i = 1;
+        return p.es.replace(/\{x\}/g, () => {
+          const g = m[i++]; if (!g) return '';
+          const tg = g.trim(), e = tg && /[A-Za-z]{2}/.test(tg) ? core(tg, depth + 1) : undefined;
+          return e !== undefined ? g.replace(tg, e) : g;
+        });
+      }
+      return undefined;
+    };
+    const t = (s) => {
+      if (!s || typeof s !== 'string' || !/[A-Za-z]{2}/.test(s)) return s;
+      const c = cache.get(s);
+      if (c !== undefined) return c;
+      const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(s);
+      const body = m[2].replace(/\s+/g, ' ');
+      const r0 = body ? core(body) : undefined;
+      const r = r0 === undefined ? s : m[1] + r0 + m[3];
+      if (cache.size > 3000) cache.clear();
+      cache.set(s, r);
+      return r;
+    };
+    t.__on = true;
+    plusEsT = t;
+    const ATTRS = ['title', 'placeholder', 'aria-label'];
+    const skip = (el) => !!(el && el.closest && el.closest('[translate="no"], script, style, code, textarea, #psmod-news-body'));
+    const doText = (n) => {
+      const p = n.parentElement;
+      if (!p || skip(p)) return;
+      const v = n.nodeValue;
+      if (n.__psEs === v) return;
+      const r = t(v);
+      n.__psEs = r;
+      if (r !== v) n.nodeValue = r;
+    };
+    const doEl = (el) => {
+      // Text boxes are marked translate="no" (for what's typed), not their placeholder.
+      if (skip(/^(INPUT|TEXTAREA)$/.test(el.tagName) ? el.parentElement : el)) return;
+      for (const a of ATTRS) { const v = el.getAttribute && el.getAttribute(a); if (v) { const r = t(v); if (r !== v) el.setAttribute(a, r); } }
+    };
+    const walk = (root) => {
+      if (root.nodeType === 3) { doText(root); return; }
+      if (root.nodeType !== 1 || skip(root)) return;
+      doEl(root);
+      const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+      let n;
+      while ((n = tw.nextNode())) { if (n.nodeType === 3) doText(n); else doEl(n); }
+    };
+    walk(document.body);
+    new MutationObserver((ms) => {
+      for (const m of ms) {
+        if (m.type === 'characterData') doText(m.target);
+        else if (m.type === 'attributes') doEl(m.target);
+        else m.addedNodes.forEach(walk);
+      }
+    }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS });
+    // The HUD and the share card are drawn on canvases.
+    const P = CanvasRenderingContext2D.prototype;
+    for (const k of ['fillText', 'strokeText', 'measureText']) {
+      const orig = P[k];
+      P[k] = function (s, ...a) { return orig.call(this, typeof s === 'string' ? t(s) : s, ...a); };
+    }
+  }
+  waitFor(() => NS && NS.I18n && NS.I18n.lang && document.body, setupPlusEs, 'plusEs');
+
   // ------------------------------------------------ what's new (extension)
   // The game's "What's new" screen gets two tabs: the game's own changes and
   // PokeSurvivor Plus's, with every past version. The button's dot also
   // lights up when PokeSurvivor Plus was updated.
   const PLUS_NEWS = [
+    { v: '1.4', d: '18 October 2026',
+      new: ['Create a room without inviting anyone: Friends → Create room. It gets a short 6-digit code (like 482 913) to share, shown right away.',
+        'Co-op level-up: you can change your card until everyone has chosen.',
+        'Co-op: after a rift, everyone picks their bond at the same time (before, it went one player at a time).',
+        'Co-op: opening a big chest and reviving a teammate go faster with more players on it (up to 3× with three or more).',
+        'Shiny Pokémon twinkle now and then during a run, yours and your teammates’.',
+        'A soft red glow around the screen while your health is under 20% (Settings → HUD & UI → Panels and messages).'],
+      chg: ['A new Kick button on players’ cards in the room (it asks “Sure?” before removing them).',
+        'Bigger party cards on the main menu, a red Leave room button, and more space between the menu buttons.',
+        'Upgrades always opens on your partner.'],
+      fix: ['Choosing a new partner on the Pokémon screen now updates your card in the room straight away.'] },
+    { v: '1.3', d: '17 October 2026',
+      new: ['PokeSurvivor Plus in Spanish: with the game set to Español (Settings → Accessibility → Language), Plus’s menus, settings, panels, tooltips and messages are in Spanish too. What’s new stays in English.',
+        'Friends list: what each friend is doing (online, in a lobby, in a solo or co-op run), and a Join button to hop into a friend’s lobby without an invite.',
+        'Anyone in a room can invite friends, not only the host.',
+        'Room codes: “Room code” on the room panel shows a code (and a join link) anyone can use to join, even if they aren’t your friend, from Friends → “Room code or link”. Handy for streams. It warns first that players who join can see your IP address.',
+        'The host can remove a player from the room (✕ on their card, click twice); they can’t come back to that room. A full room tells people it’s full before they try to join.'],
+      chg: ['The bond window is narrower.',
+        'With bigger rooms on, the main menu’s Friends says “up to 8”.'],
+      fix: ['National Pokédex: choosing a partner no longer switches the list back to the last region while the National tab stays selected.',
+        'After a rift in co-op, a boss could spawn back in the arena, thousands of metres away, and get stuck there: the host now waits until everyone is out, and a boss that ends up that far away is brought back.',
+        'Upgrades with a controller: the cursor stays on the upgrade you just bought instead of jumping to the Pokémon picker.'] },
+    { v: '1.2', d: '17 October 2026',
+      new: ['Rooms of up to 8 players. Everyone in a room of 5-8 needs PokeSurvivor Plus 1.2 (Settings → Extras → Co-op, on by default). Four new player colours. Enemies come faster and tougher with each player past 4, but less steeply than from 1 to 4, so long runs stay playable. Runs of 5-8 are never sent to the leaderboard and your best times stay as they were; coins, tickets and achievements as usual.',
+        'Upgrades and level-up cards: hover a move (in the move list, the move picker, the ban list or a level-up card) to see what it does; an upgrade card also shows what changes.',
+        'Altars: picking up a power says what it does, and hovering its tag above your health (or a boost tag) explains it.',
+        'Colour blind mode: “Apply to” UI only, or UI and Pokémon / scene.'],
+      chg: ['In rooms of 5-8, teammates get one compact line each at the top left, beside the damage panel when it’s open.',
+        'Bonding moves keeps the move you had selected (as learning a new move already did).',
+        'The Endless button’s ∞ is pixel art, like the other menu icons.'],
+      fix: ['The mouse wheel scrolls the Pokémon list again, instead of switching regions.',
+        'In rooms of 5-8, the redesigned HUD no longer switches off when a teammate holds an item.',
+        'Colour blind mode “UI only” no longer moves the Support button.',
+        'The tooltip on friends’ names (and on the shiny badge) is in English.',
+        'Accepting an invite to a room of 4 (and joining as player 5-8) no longer says the room is full; if the host can’t take more than 4, the message says why.',
+        'After a refused join, joining that room again no longer gets stuck on “Retrying connection” (old connection messages are cleared first).',
+        'Co-op connections: more free servers to find a direct route, and the host slows a player’s updates when their connection falls behind instead of piling data up.'] },
     { v: '1.0', d: '17 October 2026',
       new: ['PokeSurvivor Plus 1.0!',
         'Endless runs: the big purple ∞ Endless button under Play starts one (gold Play, a normal run). No Arceus at 30:00: the run goes on like before the Judgment existed (from minute 60 enemies toughen faster and faster), rifts keep opening and a boss comes every 3 minutes. Summon Arceus from the pause menu to end it (the host, in co-op). Never on the leaderboard, no achievements, your game stats and best time stay as they were; coins and tickets as usual. Its own records in Stats, and an ∞ ENDLESS badge on its runs and share cards.',
@@ -9911,7 +11994,7 @@ body:has(.scr.dim:not(.hidden)) #psmod-ver{display:none}`;
     b.dataset.sfx = 'click';
     b.setAttribute('translate', 'no');
     b.title = 'What’s new in PokeSurvivor Plus';
-    b.innerHTML = `PokeSurvivor <b>Plus</b> v${esc(PLUS_VERSION)}`;
+    b.innerHTML = `PokeSurvivor <b>Plus</b> v${esc(PLUS_LABEL)}`;
     b.addEventListener('click', (e) => { e.stopPropagation(); b.blur(); try { openPlusNews(); } catch (err) { trip('setupNews', err); } });
     document.body.appendChild(b);
   }

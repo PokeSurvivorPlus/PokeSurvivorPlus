@@ -5,9 +5,9 @@
 # PokeSurvivor Plus
 
 **A free browser extension that makes [PokéSurvivor](https://pokesurvivor.com/) better:**<br>
-Endless runs, a redesigned HUD, a damage meter, a minimap, full controller support, co-op chat & pings, and dozens of quality-of-life upgrades.
+Endless runs, co-op rooms of up to 8 with room codes, a redesigned HUD, a damage meter, a minimap, full controller support, co-op chat & pings, Spanish, and dozens of quality-of-life upgrades.
 
-[![Version 1.0.0](https://img.shields.io/badge/version-1.0.0-ffd23f?style=for-the-badge)](https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/releases/latest)
+[![Version 1.4.0](https://img.shields.io/badge/version-1.4.0-ffd23f?style=for-the-badge)](https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/releases/latest)
 [![Chromium browsers](https://img.shields.io/badge/browsers-Chromium-3461b8?style=for-the-badge)](INSTALL.md)
 [![Available on the Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-available-7b4ae0?style=for-the-badge&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/pokesurvivor-plus/deobgjkejfjknofekpfccfbghgbhiidn)
 [![MIT licence](https://img.shields.io/badge/licence-MIT-46c96a?style=for-the-badge)](LICENSE)
@@ -60,7 +60,7 @@ A redesigned main menu with big Play and Endless buttons, a new HUD with team ca
 <td valign="top">
 
 ### 🤝 Better co-op
-**Ping wheel** (Help / Boss / Chest / Here), **chat** with bubbles over players, **pause for everyone**, spectate while you're down, and protection against short disconnects.
+**Rooms of up to 8 players**, **room codes** (a short 6-digit code with Friends → Create room, or a join link) so anyone can join, a **Join** button and live status on the friends list, invites from anyone in the room, **ping wheel** (Help / Boss / Chest / Here), **chat** with bubbles over players, **pause for everyone**, bonds picked together, faster chests and revives with more players, spectate while you're down, and protection against short disconnects.
 
 </td>
 <td valign="top">
@@ -110,7 +110,7 @@ A National tab, search (type **shiny** to see all your shinies), sorting, combin
 </tr>
 </table>
 
-**Plus:** colour blind mode, wider field of view, customisable bars and HUD size, hitboxes and FPS counter, Max-all upgrades, faster gacha (Use all, skip animation), Settings search, backups, a welcome tour and more. **[See every feature →](FEATURES.md)**
+**Plus:** Spanish (follows the game's language), colour blind mode (UI only or everything), a low-health vignette, shiny twinkles, wider field of view, customisable bars and HUD size, hitboxes and FPS counter, Max-all upgrades, faster gacha (Use all, skip animation), Settings search, backups, a welcome tour and more. **[See every feature →](FEATURES.md)**
 
 ## Install
 
@@ -125,7 +125,7 @@ Updates install automatically. The store page also works in **Edge**, **Brave** 
 
 ### Manual install (zip)
 
-Prefer to load it yourself, or want a release before it reaches the store? Download **`pokesurvivor-plus-1.0.0.zip`** from the [latest release](https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/releases/latest), extract it, open your browser's extensions page, turn on **Developer mode**, click **Load unpacked** and pick the extracted folder. Don't keep both versions switched on at once.
+Prefer to load it yourself, or want a release before it reaches the store? Download **`pokesurvivor-plus-1.4.0.zip`** from the [latest release](https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/releases/latest), extract it, open your browser's extensions page, turn on **Developer mode**, click **Load unpacked** and pick the extracted folder. Don't keep both versions switched on at once.
 
 Works in **Chromium-based desktop browsers** (Chrome, Edge, Brave, Opera…). Firefox, Safari and mobile aren't supported yet. Step-by-step help, updating and troubleshooting: **[INSTALL.md](INSTALL.md)**.
 

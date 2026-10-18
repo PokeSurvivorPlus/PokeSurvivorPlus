@@ -2,6 +2,73 @@
 
 All notable changes to PokeSurvivor Plus, newest first. This is the same history as the **What's new → PokeSurvivor Plus** tab inside the extension.
 
+## 1.4.0 — 18 October 2026
+
+### Added
+
+- Create a room without inviting anyone: Friends → Create room. It gets a short 6-digit code (like 482 913) to share, shown right away.
+- Co-op level-up: you can change your card until everyone has chosen.
+- Co-op: after a rift, everyone picks their bond at the same time (before, it went one player at a time).
+- Co-op: opening a big chest and reviving a teammate go faster with more players on it (up to 3× with three or more).
+- Shiny Pokémon twinkle now and then during a run, yours and your teammates’.
+- A soft red glow around the screen while your health is under 20% (Settings → HUD & UI → Panels and messages).
+
+### Changed
+
+- A new Kick button on players’ cards in the room (it asks “Sure?” before removing them).
+- Bigger party cards on the main menu, a red Leave room button, and more space between the menu buttons.
+- Upgrades always opens on your partner.
+
+### Fixed
+
+- Choosing a new partner on the Pokémon screen now updates your card in the room straight away.
+
+## 1.3.0 — 17 October 2026
+
+### Added
+
+- PokeSurvivor Plus in Spanish: with the game set to Español (Settings → Accessibility → Language), Plus’s menus, settings, panels, tooltips and messages are in Spanish too. What’s new stays in English.
+- Friends list: what each friend is doing (online, in a lobby, in a solo or co-op run), and a Join button to hop into a friend’s lobby without an invite.
+- Anyone in a room can invite friends, not only the host.
+- Room codes: “Room code” on the room panel shows a code (and a join link) anyone can use to join, even if they aren’t your friend, from Friends → “Room code or link”. Handy for streams. It warns first that players who join can see your IP address.
+- The host can remove a player from the room (✕ on their card, click twice); they can’t come back to that room. A full room tells people it’s full before they try to join.
+
+### Changed
+
+- The bond window is narrower.
+- With bigger rooms on, the main menu’s Friends says “up to 8”.
+
+### Fixed
+
+- National Pokédex: choosing a partner no longer switches the list back to the last region while the National tab stays selected.
+- After a rift in co-op, a boss could spawn back in the arena, thousands of metres away, and get stuck there: the host now waits until everyone is out, and a boss that ends up that far away is brought back.
+- Upgrades with a controller: the cursor stays on the upgrade you just bought instead of jumping to the Pokémon picker.
+
+## 1.2.0 — 17 October 2026
+
+### Added
+
+- Rooms of up to 8 players. Everyone in a room of 5-8 needs PokeSurvivor Plus 1.2 (Settings → Extras → Co-op, on by default). Four new player colours. Enemies come faster and tougher with each player past 4, but less steeply than from 1 to 4, so long runs stay playable. Runs of 5-8 are never sent to the leaderboard and your best times stay as they were; coins, tickets and achievements as usual.
+- Upgrades and level-up cards: hover a move (in the move list, the move picker, the ban list or a level-up card) to see what it does; an upgrade card also shows what changes.
+- Altars: picking up a power says what it does, and hovering its tag above your health (or a boost tag) explains it.
+- Colour blind mode: “Apply to” UI only, or UI and Pokémon / scene.
+
+### Changed
+
+- In rooms of 5-8, teammates get one compact line each at the top left, beside the damage panel when it’s open.
+- Bonding moves keeps the move you had selected (as learning a new move already did).
+- The Endless button’s ∞ is pixel art, like the other menu icons.
+
+### Fixed
+
+- The mouse wheel scrolls the Pokémon list again, instead of switching regions.
+- In rooms of 5-8, the redesigned HUD no longer switches off when a teammate holds an item.
+- Colour blind mode “UI only” no longer moves the Support button.
+- The tooltip on friends’ names (and on the shiny badge) is in English.
+- Accepting an invite to a room of 4 (and joining as player 5-8) no longer says the room is full; if the host can’t take more than 4, the message says why.
+- After a refused join, joining that room again no longer gets stuck on “Retrying connection” (old connection messages are cleared first).
+- Co-op connections: more free servers to find a direct route, and the host slows a player’s updates when their connection falls behind instead of piling data up.
+
 ## 1.0.0 — 17 October 2026
 
 ### Added
