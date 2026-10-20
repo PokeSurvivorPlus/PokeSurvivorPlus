@@ -12,8 +12,8 @@
   window.__psmod = true;
 
   const LS = 'psmod:';
-  const PLUS_VERSION = '1.4.0';   // keep in step with manifest.json
-  const PLUS_LABEL = '1.4';   // shown in the menu
+  const PLUS_VERSION = '1.5.0';   // keep in step with manifest.json
+  const PLUS_LABEL = '1.5';   // shown in the menu
   const load = (k, d) => { try { const v = localStorage.getItem(LS + k); return v == null ? d : JSON.parse(v); } catch { return d; } };
   const save = (k, v) => { try { localStorage.setItem(LS + k, JSON.stringify(v)); } catch {} };
 
@@ -56,7 +56,7 @@
   // extension, and a notice points to Settings → Extras → Status.
   const FEATURE_LABEL = {
     setupBigRooms: 'Rooms of up to 8 players', powerToast: 'Altar power message', lvlTips: 'Level-up card details', netPace: 'Co-op connection pacing', riftSafety: 'Bosses after rifts', friendsRooms: 'Friends and rooms', roomCode: 'Room codes', plusEs: 'Spanish', cbHud: 'Colour blind HUD layer', menuShinies: 'Shinies behind the menu', spriteMeta: 'Sprite data', topbar: 'Top bar', partnerSync: 'Partner in Upgrades and the room', runExtras: 'Twinkles, low health glow, faster co-op chests and revives', repick: 'Change your level-up card in co-op',
-    setupVersionTag: 'Version on the menu', endless: 'Endless mode', setupEndless: 'Endless mode',
+    gameUpdates: 'Game updates without ending your run', gamePad: 'One controller setup (the game’s own kept quiet)', setupVersionTag: 'Version on the menu', endless: 'Endless mode', setupEndless: 'Endless mode',
     setupUpgLayout: 'Upgrades layout and move shortcuts',
     setupSettingsSearch: 'Settings search', settingsSearch: 'Settings search', setupAchSearch: 'Achievement search', achSearch: 'Achievement search',
     setupFriendSearch: 'Friend search', setupUpgSearch: 'Upgrades search',
@@ -195,7 +195,7 @@
   // are registered from inside draw with Touch.addButton in HUD coordinates
   // and hit-tested against clientX/Y, so we scale those up by the same factor.
   // Touch screens keep the original size.
-  const HUD_MIN = 1, HUD_MAX = 2;
+  const HUD_MIN = 0.5, HUD_MAX = 2;
   const clampHud = (v) => Math.round(Math.min(HUD_MAX, Math.max(HUD_MIN, +v || 1)) * 10) / 10;
   let hudScale = clampHud(load('hudScale', 1.4));
 
@@ -1515,13 +1515,11 @@
   };
   const tr = (s) => { try { return NS.I18n && NS.I18n.t ? NS.I18n.t(s) : s; } catch { return s; } };
   const cap = (s) => String(s || '').charAt(0).toUpperCase() + String(s || '').slice(1);
-  function moveTip(m, pl) {
-    const TYPE = (NS.U && NS.U.TYPE_COLOR) || {};
-    const col = TYPE[m.type] || '#8fa3c4';
-    const max = (m.def && m.def.maxLvl) || 5;
-    const atk = pl.atk || 1, cdm = pl.cdMul || 1;
+  function moveRows(m, pl) {
+    // Physical moves hit with Attack, special ones with Sp. Atk (since October 2026).
+    const atk = typeof pl.atkFor === 'function' ? pl.atkFor(m) : pl.atk || 1, cdm = pl.cdMul || 1;
     const rows = [];
-    const row = (k, v) => rows.push(`<div class="kv"><span>${k}</span><b>${v}</b></div>`);
+    const row = (k, v) => rows.push([k, v]);
     if (m.kind === 'buff') {
       if (m.amount != null) row('Boost', `+${Math.round(m.amount * 100)}%`);
       if (m.dur) row('Lasts', `${m.dur.toFixed(1)} s`);
@@ -1539,10 +1537,17 @@
     if (m.slow) row('Slows', `${Math.round(m.slow * 100)}%`);
     if (m.homing) row('Homing', 'Yes');
     if (m.knock) row('Knockback', Math.round(m.knock));
+    return rows;
+  }
+  function moveTip(m, pl) {
+    const TYPE = (NS.U && NS.U.TYPE_COLOR) || {};
+    const col = TYPE[m.type] || '#8fa3c4';
+    const max = (m.def && m.def.maxLvl) || 5;
+    const rows = moveRows(m, pl).map(([k, v]) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`);
     let next = '';
     try { const nx = NS.Moves && NS.Moves.nextUpText && NS.Moves.nextUpText(m); if (nx) next = `<div class="nx">Next level: ${esc(tr(nx))}</div>`; } catch {}
     return `<div class="hd"><b style="color:${esc(col)}">${esc(tr(m.name))}${m.evolved ? ' ★' : ''}</b><span class="lv">Lv. ${m.lvl}/${max}</span></div>
-      <div class="tags"><span style="background:${esc(col)}">${esc(cap(m.type))}</span><span>${esc(KIND_NAME[m.kind] || cap(m.kind))}</span></div>
+      <div class="tags"><span style="background:${esc(col)}">${esc(cap(m.type))}</span>${m.cat === 'physical' || m.cat === 'special' ? `<span>${m.cat === 'special' ? 'Special' : 'Physical'}</span>` : ''}<span>${esc(KIND_NAME[m.kind] || cap(m.kind))}</span></div>
       ${m.desc || (m.def && m.def.desc) ? `<div class="ds">${esc(tr(m.desc || m.def.desc))}</div>` : ''}
       <div class="st">${rows.join('')}</div>${next}`;
   }
@@ -1716,10 +1721,10 @@
     b.title = 'Pause menu and settings (the cards wait for you)';
     box.appendChild(b);
     const label = () => {
+      // The key as a key cap (or the controller button), like the game's other prompts.
       const pb = binds.pause || [];
-      const k = showPadLabels() && pb[2] ? bareName(pb[2]) : 'Esc';
-      const txt = `Pause · ${k}`;
-      if (b.textContent !== txt) b.textContent = txt;
+      const html = `Pause · ${showPadLabels() && pb[2] ? glyphHtml(pb[2]) : '<kbd>Esc</kbd>'}`;
+      if (b.dataset.k !== html) { b.dataset.k = html; b.innerHTML = html; }
     };
     label();
     setInterval(() => { if (isShown('scr-levelup')) label(); }, 500);
@@ -1863,6 +1868,7 @@ html.psmod-calm #psmod-lowhp.on{animation:none}`;
     let last = performance.now();
     const twNext = new WeakMap();
     const IN_RUN = new Set(['playing', 'held', 'levelup', 'choice']);
+    let wasArena = false, riftInv = 0;
     const loop = (now) => {
       requestAnimationFrame(loop);
       const dt = Math.min(0.1, Math.max(0, (now - last) / 1000)); last = now;
@@ -1877,6 +1883,15 @@ html.psmod-calm #psmod-lowhp.on{animation:none}`;
         const os = o ? o.toFixed(2) : '0';
         if (glow.style.opacity !== os) glow.style.opacity = os;
         glow.classList.toggle('on', o > 0);
+        // Back from a rift: 1 s of safety (counted once you're playing again,
+        // after the bond), and you flash white the whole time.
+        const A = NS.Rift.arena;
+        if (wasArena && !A && pl) { riftInv = 1; pl.invuln = 1; }
+        wasArena = !!A;
+        if (riftInv > 0 && pl && state === 'playing') {
+          riftInv = Math.max(0, riftInv - dt);
+          if (!pl.dead) { if (!(pl.invuln >= riftInv)) pl.invuln = riftInv; pl.flash = riftInv > 0 && Math.floor(riftInv * 8) % 2 ? 0.06 : 0; }
+        }
         if (!pl || state !== 'playing') { runHeld(state, pl, dt); return; }
         // Shiny twinkles, every few seconds.
         const tnow = now / 1000;
@@ -1885,9 +1900,13 @@ html.psmod-calm #psmod-lowhp.on{animation:none}`;
           let nx = twNext.get(p);
           if (nx === undefined) { nx = tnow + 1 + Math.random() * 2; twNext.set(p, nx); }
           if (tnow < nx) continue;
-          twNext.set(p, tnow + 2.6 + Math.random() * 2.4);
+          twNext.set(p, tnow + 2.2 + Math.random() * 1.8);
           const r = p.r || 14, bh = p.bodyH || 30;
-          for (let i = 0; i < 3; i++) setTimeout(() => { try { if (NS.Game.state === 'playing') NS.FX.twinkle(p.x + (Math.random() * 2 - 1) * r * 1.2, p.y - (4 + Math.random() * bh)); } catch (_) { /* fine */ } }, i * 170);
+          // Five twinkles over the body, and a few specks of light drifting up.
+          for (let i = 0; i < 5; i++) setTimeout(() => { try { if (NS.Game.state === 'playing') NS.FX.twinkle(p.x + (Math.random() * 2 - 1) * r * 1.3, p.y - (2 + Math.random() * (bh + 6))); } catch (_) { /* fine */ } }, i * 130);
+          try {
+            if (NS.FX.px) for (let i = 0; i < 4; i++) NS.FX.px(p.x + (Math.random() * 2 - 1) * r, p.y - Math.random() * bh, i % 2 ? '#9ae6ff' : '#fff3a8', { vx: (Math.random() * 2 - 1) * 14, vy: -30 - Math.random() * 30, life: 0.5 + Math.random() * 0.35 });
+          } catch (_) { /* fine */ }
         }
         if (!(NS.Coop && NS.Coop.active)) return;
         const mates = (NS.Coop.puppets ? NS.Coop.puppets() : []).filter((q) => q && !q.dead);
@@ -2589,14 +2608,14 @@ html.psmod-calm #psmod-lowhp.on{animation:none}`;
     document.body.appendChild(toastBox);
   }
 
-  function toast(text, color, sub) {
+  function toast(text, color, sub, ms) {
     if (!toastBox) return;
     const d = document.createElement('div');
     d.style.setProperty('--c', color || '#f4f8ff');
     d.innerHTML = esc(text) + (sub ? `<small>${esc(sub)}</small>` : '');
     toastBox.appendChild(d);
     while (toastBox.children.length > 4) toastBox.firstChild.remove();
-    setTimeout(() => d.remove(), 4500);
+    setTimeout(() => d.remove(), ms || 4500);
   }
 
   function sound(name) {
@@ -2786,9 +2805,12 @@ html.psmod-calm #psmod-lowhp.on{animation:none}`;
       hist.unshift(s);
       save('history', hist.slice(0, HISTORY_MAX));
       save('historyNew', true);
+      lastOverRun = s;
+      { const so = document.getElementById('psmod-share-over'); if (so) so.hidden = false; }
       syncRunsButtons();
     }
   }
+  let lastOverRun = null;   // the run just saved, for Share card on the game-over screen
 
   // ---- personal records, per Pokémon (kept for good, unlike the last 30 runs)
   const REC_KEYS = [['time', 'Longest run'], ['level', 'Highest level'], ['kills', 'Most defeated'], ['dps', 'Best damage/s'], ['dmg', 'Most damage']];
@@ -3233,17 +3255,37 @@ tr.run:hover .psm-del,.psm-del:focus-visible,.psm-del.psmod-padfocus{opacity:1}
     const isNew = !!load('historyNew', false) && load('history', []).length > 0;
     for (const b of document.querySelectorAll('.psmod-runs-btn')) b.classList.toggle('new', isNew);
   }
+  // Game-over screen: Back to menu and Share card side by side, Runs & records under them.
   function setupRunsButtons() {
     const again = document.getElementById('btn-again');
     if (again && !document.getElementById('psmod-runs-over')) {
+      const st = document.createElement('style');
+      st.textContent = '#psmod-over-row{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap}#psmod-over-row .btn{margin:0}#psmod-runs-over{display:block;margin:10px auto 0}';
+      document.head.appendChild(st);
+      const row = document.createElement('div');
+      row.id = 'psmod-over-row';
+      again.before(row);
+      row.appendChild(again);
+      const sh = document.createElement('button');
+      sh.id = 'psmod-share-over';
+      sh.className = 'btn';
+      sh.textContent = 'Share card';
+      sh.title = 'A picture of this run to paste in your chat';
+      sh.hidden = true;
+      sh.addEventListener('click', (e) => { e.stopPropagation(); sh.blur(); if (lastOverRun) openShare(lastOverRun); });
+      row.appendChild(sh);
       const b = document.createElement('button');
       b.id = 'psmod-runs-over';
       b.className = 'btn small ghost psmod-runs-btn';
       b.textContent = 'Runs & records';
       b.title = 'Your latest runs and the details of each (Alt + H)';
-      b.style.marginLeft = '8px';
       b.addEventListener('click', (e) => { e.stopPropagation(); b.blur(); showSummary(); });
-      again.after(b);
+      row.after(b);
+      const over = document.getElementById('scr-over');
+      const sync = () => { sh.hidden = !lastOverRun; };
+      if (over) new MutationObserver(sync).observe(over, { attributes: true, attributeFilter: ['class'] });
+      again.addEventListener('click', () => { lastOverRun = null; sync(); });
+      sync();
     }
     runFeature('menuItems', setupMenuItems);
     syncRunsButtons();
@@ -3752,14 +3794,18 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
       if (!items.length) return;
       // Ban: its "Choose" button goes under the bar, so the card keeps its size.
       for (const it of items) {
-        const ban = it.querySelector('.upg-btns [data-ban]');
-        if (ban) { ban.classList.add('psm-ban'); it.children[1].appendChild(ban); }
+        // (Starting move's "Choose: …" too, since 19 October 2026.)
+        for (const ban of it.querySelectorAll('.upg-btns [data-ban], .upg-btns [data-start]')) { ban.classList.add('psm-ban'); it.children[1].appendChild(ban); }
       }
       const bind = list.querySelector(':scope > .bind-panel');
       if (!bind) return;
-      items[items.length - 1].after(bind);
+      // An open picker (Ban, Starting move) goes right under the cards, Move shortcuts after it.
+      const pickers = [...list.querySelectorAll(':scope > .ban-picker')];
+      let last = items[items.length - 1];
+      for (const pk of pickers) { pk.style.gridColumn = '1 / -1'; last.after(pk); last = pk; }
+      last.after(bind);
       const cols = getComputedStyle(list).gridTemplateColumns.split(' ').filter(Boolean).length || 1;
-      const free = (cols - (items.length % cols)) % cols;
+      const free = pickers.length ? 0 : (cols - (items.length % cols)) % cols;
       const span = free >= 2 ? free : cols;
       bind.style.gridColumn = span >= cols ? '1 / -1' : `span ${span}`;
       bind.style.setProperty('--psm-cols', span >= cols ? (cols >= 2 ? 4 : 2) : span >= 3 ? 4 : 2);
@@ -4456,9 +4502,52 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
   // again; picking a region tab leaves National.
   let dexNational = load('dexNational', false);
 
+  // Since October 2026 the game has an "All" tab of its own, and draws the
+  // list 48 Pokémon at a time as you scroll: its tab becomes our National
+  // (opened by default when you last used it), and the observer that draws
+  // the next 48 is kept so a sort of ours that needs every Pokémon can draw
+  // the rest.
+  let dexMoreIO = null;
+  try {
+    const IO = window.IntersectionObserver;
+    if (IO && !IO.__psm) {
+      const W = function (cb, opts) { const io = new IO(cb, opts); if (opts && opts.rootMargin === '300px') dexMoreIO = { io, cb }; return io; };
+      W.prototype = IO.prototype; W.__psm = true;
+      window.IntersectionObserver = W;
+    }
+  } catch (_) { /* the game's own */ }
+  function dexLoadAll1() {
+    const m = document.querySelector('#dex-grid .dex-more');
+    if (m && dexMoreIO) try { dexMoreIO.cb([{ isIntersecting: true, target: m }], dexMoreIO.io); } catch (_) { /* the game's */ }
+  }
+  const newDex = () => !!document.getElementById('dex-q');
+  function setupDexNationalNew(gens) {
+    const scr = document.getElementById('scr-dex');
+    const first = () => gens.querySelector('.gen-tab');
+    const label = () => { const b = first() && first().querySelector('b'); if (b && b.textContent !== 'National') b.textContent = 'National'; };
+    dexApi = {
+      isNational: () => !!(first() && first().classList.contains('on')),
+      setNational: (v) => { if (v && first() && !first().classList.contains('on')) first().click(); },
+    };
+    gens.addEventListener('click', (e) => {
+      const t = e.target.closest('.gen-tab'); if (!t) return;
+      dexNational = t === first(); save('dexNational', dexNational);
+    }, true);
+    new MutationObserver(label).observe(gens, { childList: true });
+    label();
+    // Opening the screen: back to National if that's where you were.
+    let open = scr && !scr.classList.contains('hidden');
+    if (scr) new MutationObserver(() => {
+      const now = !scr.classList.contains('hidden');
+      if (now && !open && dexNational) requestAnimationFrame(() => dexApi.setNational(true));
+      open = now;
+    }).observe(scr, { attributes: true, attributeFilter: ['class'] });
+  }
+
   function setupDexNational() {
     const gens = document.getElementById('dex-gens'), grid = document.getElementById('dex-grid');
     if (!gens || !grid) return;
+    if (newDex()) { setupDexNationalNew(gens); return; }
     let busy = false, natCache = null;
     const gameTabs = () => [...gens.querySelectorAll('.gen-tab:not(#psmod-nat)')];
 
@@ -4990,12 +5079,32 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
     if (was && was.ping) pingUp();
   }
 
+  // The game has its own controller support since October 2026. Ours does
+  // the same and more (bindings, prompts, the cursor everywhere), so the
+  // game's is kept quiet: its loop and rumble do nothing, and its right-stick
+  // aim ("Manual aim") is fed from ours.
+  let padAim = null, padAimAt = 0;
+  waitFor(() => NS && NS.Pad && typeof NS.Pad.poll === 'function' && typeof NS.Pad.aim === 'function', function gamePad() {
+    const P = NS.Pad;
+    P.poll = function () {};
+    P.rumble = function () {};
+    P.aim = function () { return padOn && padAim ? padAim : null; };
+    try { Object.defineProperty(P, 'aimAt', { get: () => padAimAt, configurable: true }); } catch (_) { /* read-only */ }
+    if (typeof P.vector === 'function') P.vector = function () { return [0, 0]; };
+  }, 'gamePad');
   let padPrev = new Set();
   function padLoop() {
     requestAnimationFrame(padLoop);
     if (!padOn || document.hidden) { if (padDownWas.size) padReleaseAll(); padPrev = new Set(); syncPadRing(); if (hintKey) try { syncPadHints(); } catch (_) { /* ignore */ } return; }
     const gp = activePad();
     const down = gp ? readInputs(gp, padPrev) : new Set();
+    {
+      const ax = gp ? [gp.axes[2] || 0, gp.axes[3] || 0] : [0, 0];
+      // (Not when an action of yours is on the right stick.)
+      const rsBound = Object.values(binds).some((b) => (b || []).some((c) => /^Axis[23]/.test(c || '')));
+      padAim = !rsBound && !pingWheel && !menuMode() && Math.hypot(ax[0], ax[1]) >= 0.35 ? ax : null;
+      if (padAim) padAimAt = performance.now();
+    }
     if (pingWheel && pingWheel.src === 'pad' && gp) {
       const st = [gp.axes[2] || 0, gp.axes[3] || 0];
       // Keep the last direction pushed: letting the stick go doesn't undo the choice.
@@ -5564,12 +5673,20 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
       const centre = (bx - ax) * dx + (by - ay) * dy;
       if (centre <= 2 || along < -Math.min(a.width, a.height) / 2) continue;
       const across = dx ? Math.max(0, Math.abs(by - ay) - (a.height + t.r.height) / 2) : Math.max(0, Math.abs(bx - ax) - (a.width + t.r.width) / 2);
-      const score = Math.max(0, along) + across * 3;
+      // Something level with you (same row / column) beats one a little
+      // nearer that is off to the side: right from Continue is Settings, not
+      // the button under them.
+      const score = Math.max(0, along) + across * 3 + (across > 0 ? 40 : 0);
       if (t.on) { if (score < bs) { bs = score; best = t; } }
       // Out of view but in a box that scrolls: scrolled to on the way.
       else if (score < hs && scrollParent(t.el)) { hs = score; hidden = t; }
       // The nearest one in the same scrolling box, seen or not.
       if (scroller && scroller.contains(t.el) && score < ss) { ss = score; same = t; }
+    }
+    // Pause menu of an endless run: right from the last button goes down to Summon Arceus.
+    if (!best && dir === 'right' && cur.id === 'btn-quit') {
+      const sm = document.getElementById('psmod-summon');
+      if (sm && navVisible(sm)) { navSet(sm); return; }
     }
     // Inside a scrolling list, keep to the list until its end before leaving
     // it (for the header, the tabs…).
@@ -5744,6 +5861,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
     extrasBody = body;
     const st = document.createElement('style');
     st.textContent = `
+#set-tabs .gen-tab[data-t="a11y"]{display:none!important}
 #set-body .psx-step{display:flex;align-items:center;gap:6px;flex:none}
 #set-body .psx-step b{min-width:46px;text-align:center}
 #set-body .psx-step .btn{min-width:38px}
@@ -5904,7 +6022,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
         try {
           for (const t of [...tabs.querySelectorAll('.gen-tab')]) {
             const id = t.dataset.t;
-            if (!id) continue;
+            if (!id || id === 'a11y') continue;   // the game's, folded into ours
             showTab(id);
             await settle();
             collect(id, t.textContent.trim(), out);
@@ -6483,13 +6601,15 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
       const sw8 = ['fire', 'water', 'grass', 'electric', 'psychic', 'poison', 'ice', 'dragon', 'fairy', 'ground'].filter((t) => TYPE[t]);
       return `<h3 class="set-h">Language</h3>
         <p class="sub" style="margin:0 0 4px">The game reloads when you change it.</p>
-        <div class="chips set-chips" translate="no">${[['en', 'English'], ['es', 'Español']].map(([v, l]) => `<button class="chip${lang === v ? ' on' : ''}" data-px="lang:${v}">${l}</button>`).join('')}</div>
+        <div class="chips set-chips" translate="no">${((window.PS_LOCALES && window.PS_LOCALES.choices) || (NS && NS.I18n && NS.I18n.choices) || [['en', 'English'], ['es', 'Español']]).map(([v, l]) => `<button class="chip${lang === v ? ' on' : ''}" data-px="lang:${v}">${l}</button>`).join('')}</div>
         <h3 class="set-h">Colour blind mode</h3>
         ${srow('Colour correction', 'Shifts the game’s colours so the ones you have trouble with are easier to tell apart. The swatches below change with it.', '')}
         ${chips([['cb:off', 'Off', cbMode === 'off'], ['cb:protan', 'Protanopia (red)', cbMode === 'protan'], ['cb:deutan', 'Deuteranopia (green)', cbMode === 'deutan'], ['cb:tritan', 'Tritanopia (blue)', cbMode === 'tritan']])}
         <div class="psx-swatches">${sw8.map((t) => `<i style="background:${TYPE[t]}">${cap(tr(t))}</i>`).join('')}<i style="background:#e83a4a;color:#fff">Health</i><i style="background:#46c96a">Heal</i><i style="background:#3aa6ff">Exp</i></div>
         ${cbMode !== 'off' ? srow('Apply to', 'Only the interface (menus, windows and the HUD), or the Pokémon and the scene too.', '') + chips([['cbscope:ui', 'UI only', cbScope === 'ui'], ['cbscope:all', 'UI and Pokémon / scene', cbScope !== 'ui']]) : ''}
         ${cbMode !== 'off' ? srow('Strength', 'How far confusable colours are pushed apart. Reset is the tuned amount; go higher if some still look alike.', step('cbs', pct(cbStrength / CB_DEFAULT))) : ''}
+        ${NS && NS.Settings && document.querySelector('#set-tabs .gen-tab[data-t="a11y"]') ? `<h3 class="set-h">Aiming</h3>
+        ${srow('Manual aim', 'Your attacks go toward the mouse (or where you push the right stick) instead of the nearest enemy. Let go of the stick without moving the mouse and it aims by itself again. Chain and meteors still find enemies on their own (the game’s own setting).', sw('aimman', !!NS.Settings.get('aimManual')))}` : ''}
         <h3 class="set-h">Motion</h3>
         ${srow('Less shake and flashes', 'The camera shakes less and flashes are softer (the game’s own setting).', sw('calm', calm))}
         ${srow('Fewer PokeSurvivor Plus animations', 'Rainbow and moving bars hold still, the logo stops glowing and previews stop moving.', sw('rmotion', reduceMotion))}`;
@@ -6526,9 +6646,25 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
   function injectSection() {
     if (!extrasBody || ourTab) return;
     const tab = currentGameTab();
+    if (tab === 'a11y') { openOurTab('psmod-acc'); return; }
     const old = document.getElementById('psmod-sec');
     if (!['sound', 'gfx', 'ctl'].includes(tab)) { if (old) old.remove(); if (extrasObs) extrasObs.takeRecords(); return; }
     if (tab === 'ctl') {
+      // The game's own "With a controller" part (its switches and button
+      // list): ours above does the same.
+      const gp = extrasBody.querySelector('.switch[data-k="gamepad"]');
+      if (gp) {
+        const row = gp.closest('.set-row');
+        let h = row && row.previousElementSibling;
+        while (h && h.tagName !== 'H3') { const prev = h.previousElementSibling; if (h.classList.contains('sub')) h.remove(); h = prev; }
+        if (h) h.remove();
+        const rr = extrasBody.querySelector('.switch[data-k="padRumble"]');
+        let after = (rr && rr.closest('.set-row')) || row;
+        const keys = after && after.nextElementSibling;
+        if (keys && keys.classList.contains('keys')) keys.remove();
+        if (rr && rr.closest('.set-row')) rr.closest('.set-row').remove();
+        if (row) row.remove();
+      }
       // The game's "On PC" key list: our bindings table replaces it.
       for (const h of extrasBody.querySelectorAll('h3.set-h')) {
         if (!/\b(PC|pc)\b/.test(h.textContent)) continue;
@@ -6644,6 +6780,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
       case 'bar-reset': Object.assign(barSet, BAR_DEF); save('bars', barSet); break;
       case 'pad': padOn = !padOn; save('padOn', padOn); if (!padOn) { padReleaseAll(); navClear(); } syncChoiceLabels(); break;
       case 'rumble': padRumble = !padRumble; save('padRumble', padRumble); break;
+      case 'aimman': if (NS && NS.Settings) NS.Settings.set('aimManual', !NS.Settings.get('aimManual')); break;
       case 'padstyle': padStyleSet = PAD_LABELS[arg] || arg === 'auto' ? arg : 'auto'; save('padStyleSet', padStyleSet);
         { const gp = activePad(); padStyle = gp ? styleFor(gp.id) : padStyleSet !== 'auto' ? padStyleSet : 'xbox'; } break;
       case 'keys-reset': binds = defBinds(); save('keys', binds); rebuildBinds(); listening = null; break;
@@ -7080,18 +7217,39 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
   let dexApi = null; // set by the National tab code
 
   // ---- favourite Pokémon (kept in this browser)
+  // Since the game has favourites of its own (saved with your game, so they
+  // follow your account), ours are those: the ★ on a Pokémon's page, the
+  // game's Favourites filter and the ◀ ▶ arrows on the main menu all use
+  // the same list. The ones kept in this browser before are added to it once.
   let favList = load('favs', []).filter((d) => Number.isInteger(d));
   const favShiny = load('favShiny', {});
-  const isFav = (d) => favList.includes(+d);
+  const gameFavs = () => !!(NS && NS.DB && typeof NS.DB.isFav === 'function' && typeof NS.DB.setFav === 'function');
+  const isFav = (d) => (gameFavs() ? NS.DB.isFav(+d) : favList.includes(+d));
   let favChanged = () => {};
   function setFav(d, on) {
     d = +d;
-    favList = favList.filter((x) => x !== d);
-    if (on) favList.push(d);
-    save('favs', favList);
+    if (gameFavs()) NS.DB.setFav(d, !!on);
+    else { favList = favList.filter((x) => x !== d); if (on) favList.push(d); save('favs', favList); }
     favChanged();
   }
-  const ownedFavs = () => { const o = (NS && NS.DB && NS.DB.save && NS.DB.save.owned) || {}; return favList.filter((d) => o[d]); };
+  const ownedFavs = () => {
+    const sv = (NS && NS.DB && NS.DB.save) || {}, o = sv.owned || {};
+    if (gameFavs()) return Object.entries(sv.dfav || {}).filter(([d, t]) => +t > 0 && o[d]).sort((a, b) => a[1] - b[1]).map(([d]) => +d);
+    return favList.filter((d) => o[d]);
+  };
+  // Favourites from before go into the game's list (once: one you removed stays removed).
+  setInterval(() => {
+    const sv = NS && NS.DB && NS.DB.save;
+    if (!gameFavs() || !sv || !favList.length) return;
+    const df = sv.dfav || {};
+    const todo = favList.filter((d) => df[d] === undefined);
+    if (!todo.length) return;
+    sv.dfav = df;
+    const t0 = Date.now() - todo.length;
+    todo.forEach((d, i) => { df[d] = t0 + i; });
+    try { NS.DB.commit(); } catch (_) { /* saved with the next change */ }
+    favChanged();
+  }, 3000);
   // ---- learnable moves on a Pokémon's page: one chip per move (icon, name,
   // type colour), the starting move first, then its own types, then Normal.
   // Hovering one shows the same card as the HUD's move tooltips.
@@ -7114,7 +7272,8 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
   function catalogTip(id, no) {
     const M = NS.Moves, mon = (NS.DEX_BY && NS.DEX_BY[no]) || {};
     const m = M.instance ? M.instance(id, 1) : Object.assign({ lvl: 1, def: M.BY_ID[id] }, M.BY_ID[id]);
-    let html = moveTip(m, { atk: mon.atk || 1, cdMul: 1 }).replace(/<span class="lv">Lv\. 1\/(\d+)<\/span>/, '<span class="lv">Max Lv. $1</span>');
+    const fit = (mm) => { try { return NS.Stats && NS.Stats.fit ? NS.Stats.fit(mon, mm.cat) : 1; } catch (_) { return 1; } };
+    let html = moveTip(m, { atk: mon.atk || 1, cdMul: 1, atkFor: (mm) => (mon.atk || 1) * fit(mm) }).replace(/<span class="lv">Lv\. 1\/(\d+)<\/span>/, '<span class="lv">Max Lv. $1</span>');
     const start = NS.startMoveOf && NS.startMoveOf(no) === id;
     const banned = (((NS.DB && NS.DB.save && NS.DB.save.pban) || {})[no] || []).includes(id);
     if (start) html += '<div class="nx">Its starting move.</div>';
@@ -7124,36 +7283,55 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
   let mtipEl = null;
   // Anything that names a move can show what it does: the Pokémon page's
   // chips, and on the Upgrades screen the Ban list and Move shortcuts.
-  const MOVE_TIP_SEL = '.psd-mv[data-mv], [data-psm-mv], #cards .card[data-psm-key]';
+  const MOVE_TIP_SEL = '.psd-mv[data-mv], [data-psm-mv]';
   // Level-up cards: the offers behind them (in the same order).
   let lvlOffers = [];
-  function lvlCardTip(key) {
+  // What a move card gives, written on the card: a new move's numbers, or
+  // for a level up only what changes (old → new).
+  function lvlCardStats(key) {
     const pl = me(), Mv = NS.Moves;
     const [type, id] = String(key).split(':');
     if (!pl || !Mv || !Mv.instance || !id || !(type === 'new' || type === 'up' || type === 'evo')) return '';
     const cur = (pl.moves || []).find((m) => m.id === id);
-    if (type === 'new') return `<div class="nx" style="margin:0 0 4px">New move</div>` + moveTip(Mv.instance(id, 1), pl);
-    if (!cur) return '';
-    if (type === 'evo' || cur.evolved) return moveTip(cur, pl);
+    const chip = (k, v) => `<span><small>${k}</small> ${v}</span>`;
+    if (type === 'new' || !cur) return moveRows(Mv.instance(id, 1), pl).map(([k, v]) => chip(k, v)).join('');
+    if (type === 'evo' || cur.evolved) return moveRows(cur, pl).map(([k, v]) => chip(k, v)).join('');
     const nxt = Mv.instance(id, cur.lvl + 1);
-    const atk = pl.atk || 1, cdm = pl.cdMul || 1;
-    const ch = [];
-    const cmp = (label, a, b, fmt) => { if (a != null && b != null && Math.abs(a - b) > 1e-6) ch.push(`<div class="kv"><span>${label}</span><b>${fmt(a)} → <span style="color:#7dff9a">${fmt(b)}</span></b></div>`); };
-    cmp('Damage', cur.dmg != null ? cur.dmg * atk : null, nxt.dmg != null ? nxt.dmg * atk : null, (v) => Math.round(v));
-    cmp('Cooldown', cur.cd != null ? cur.cd * cdm : null, nxt.cd != null ? nxt.cd * cdm : null, (v) => v.toFixed(2) + ' s');
-    cmp(cur.kind === 'orbit' ? 'Orbs' : 'Count', cur.count || 1, nxt.count || 1, (v) => v);
-    cmp('Pierce', cur.pierce || 0, nxt.pierce || 0, (v) => v);
-    cmp(cur.kind === 'aura' || cur.kind === 'orbit' ? 'Radius' : 'Range', cur.radius, nxt.radius, (v) => Math.round(v));
-    cmp('Duration', cur.dur, nxt.dur, (v) => v.toFixed(1) + ' s');
-    if (cur.kind === 'buff') cmp('Boost', cur.amount, nxt.amount, (v) => '+' + Math.round(v * 100) + '%');
-    return moveTip(nxt, pl) + (ch.length ? `<hr><div class="lv" style="margin-bottom:2px">Lv. ${cur.lvl} → ${cur.lvl + 1}</div><div class="st">${ch.join('')}</div>` : '');
+    const a = new Map(moveRows(cur, pl)), out = [`<span class="lv">Lv. ${cur.lvl} → ${cur.lvl + 1}</span>`];
+    for (const [k, v] of moveRows(nxt, pl)) {
+      const old = a.get(k);
+      if (old === undefined) out.push(chip(k, `<b class="up">${v}</b>`));
+      else if (String(old) !== String(v)) out.push(chip(k, `${old} → <b class="up">${v}</b>`));
+    }
+    return out.length > 1 ? out.join('') : '';
   }
+  let lvlStatCss = false;
   function tagLvlCards() {
     const box = document.getElementById('cards');
     if (!box) return;
     const cards = box.querySelectorAll(':scope > .card');
     if (cards.length !== lvlOffers.length) return;
-    cards.forEach((el, i) => { const k = (lvlOffers[i] && lvlOffers[i].key) || ''; if (el.dataset.psmKey !== k) el.dataset.psmKey = k; });
+    if (!lvlStatCss) {
+      lvlStatCss = true;
+      const st = document.createElement('style');
+      st.textContent = `#cards .card .psm-cstat{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:5px}
+#cards .card .psm-cstat span{font-size:12px;line-height:1.25;padding:1px 7px;border-radius:6px;background:rgba(0,0,0,.25);color:#fff;white-space:nowrap}
+#cards .card .psm-cstat small{font-size:11px;color:var(--muted,#b9cbf0)}
+#cards .card .psm-cstat .lv{background:rgba(255,210,63,.16);color:var(--gold,#ffd23f)}
+#cards .card .psm-cstat b.up{color:#7dff9a}`;
+      document.head.appendChild(st);
+    }
+    cards.forEach((el, i) => {
+      const k = (lvlOffers[i] && lvlOffers[i].key) || '';
+      if (el.dataset.psmKey === k && (el.querySelector('.psm-cstat') || !k)) return;
+      el.dataset.psmKey = k;
+      const old = el.querySelector('.psm-cstat');
+      if (old) old.remove();
+      let html = '';
+      try { html = k ? lvlCardStats(k) : ''; } catch (err) { trip('lvlTips', err); }
+      const txt = el.querySelector('.txt');
+      if (html && txt) txt.insertAdjacentHTML('beforeend', `<div class="psm-cstat">${html}</div>`);
+    });
   }
   waitFor(() => NS && NS.LevelUp && NS.LevelUp.offer && NS.RunUI && NS.RunUI.showLevelUp, function setupLvlTips() {
     const offer = NS.LevelUp.offer, showLv = NS.RunUI.showLevelUp;
@@ -7188,7 +7366,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
       cur = chip;
       const id = chip.dataset.mv || chip.dataset.psmMv;
       const dex = +chip.dataset.dex || +((document.getElementById('upg-mon') || {}).value) || 0;
-      try { mtipEl.innerHTML = chip.dataset.psmKey != null && !id ? lvlCardTip(chip.dataset.psmKey) : catalogTip(id, dex); } catch (err) { trip('moveList', err); return; }
+      try { mtipEl.innerHTML = catalogTip(id, dex); } catch (err) { trip('moveList', err); return; }
       if (!mtipEl.innerHTML) { mtipEl.hidden = true; return; }
       mtipEl.hidden = false;
       place(chip);
@@ -7208,10 +7386,27 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
   }
 
   function setupDexExtras() {
+    // NEW: the game's own collection screen since October 2026 (search, type,
+    // filters that combine, favourites, sorts, drawn 48 at a time). Its
+    // filters and search are kept; its sort row and favourite buttons are
+    // hidden for ours.
+    const NEW = newDex();
     const SORTS = [['dex', 'Pokédex #'], ['az', 'A–Z'], ['hp', 'HP'], ['atk', 'Attack'], ['spd', 'Speed'], ['tier', 'Tier']];
+    // Only PokeSurvivor Plus's sorts are offered (the game's sort row is hidden);
+    // Pokédex # and A–Z are handed to the game's list, which draws them faster.
+    const NATIVE = { dex: 'num', az: 'name' }, GSORTS = ['num', 'name', 'rar', 'new', 'used'];
     let sortKey = SORTS.some(([k]) => k === load('dexSort', 'dex')) ? load('dexSort', 'dex') : 'dex';
     let sortRev = !!load('dexSortRev', false);   // the other way round from the natural order
-    const DIRS = { dex: ['1→966', '966→1'], az: ['A→Z', 'Z→A'], hp: ['high→low', 'low→high'], atk: ['high→low', 'low→high'], spd: ['high→low', 'low→high'], tier: ['best→worst', 'worst→best'] };
+    const DIRS = { dex: ['1→966', '966→1'], az: ['A→Z', 'Z→A'], hp: ['high→low', 'low→high'], atk: ['high→low', 'low→high'], spd: ['high→low', 'low→high'], tier: ['best→worst', 'worst→best'],
+      rar: ['rarest first', 'commonest first'], new: ['newest first', 'oldest first'], used: ['most first', 'least first'] };
+    // With the game's list: ours that it can't do (or the other way round) need every Pokémon drawn.
+    const custom = () => NEW && (sortRev || !NATIVE[sortKey]);
+    const syncNative = () => {
+      if (!NEW) return;
+      const chips = [...document.querySelectorAll('#dex-sort .chip')];
+      const c = chips[GSORTS.indexOf(NATIVE[sortKey] || 'num')];
+      if (c && !c.classList.contains('on')) c.click();
+    };
     const head = document.querySelector('#scr-dex .row.between');
     const grid = document.getElementById('dex-grid');
     if (!head || !grid || document.getElementById('psmod-dex-search')) return;
@@ -7298,6 +7493,24 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
       <button class="btn small" id="psmod-tiers" aria-pressed="false"><span class="dot"></span>Tiers</button>`;
     head.insertBefore(tools, head.lastElementChild);
     const input = tools.querySelector('input');
+    if (NEW) {
+      input.hidden = true; input.style.display = 'none';
+      const st2 = document.createElement('style');
+      st2.textContent = `#scr-dex #dex-sort,#dex-detail #dex-fav{display:none!important}
+#dex-grid .cell .no img{display:none}
+#dex-grid .dex-more{order:999999}
+#dex-grid.psm-sorting > *{visibility:hidden}
+#dex-grid.psm-sorting::before{content:attr(data-psm-sorting);grid-column:1/-1;color:var(--muted,#b9cbf0);padding:8px}
+#dex-detail .psd-sec p.sub.center{text-align:left;margin:4px 0 0!important;font-size:12px}`;
+      document.head.appendChild(st2);
+      // Clearing the filters puts the order back too.
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#dex-clear')) return;
+        sortKey = 'dex'; sortRev = false; save('dexSort', 'dex'); save('dexSortRev', false); drawSort();
+      }, true);
+      const sr = document.getElementById('dex-sort');
+      if (sr) new MutationObserver(() => syncNative()).observe(sr, { childList: true });
+    }
     tierStyle();
     setupMoveTips();
     const tierBtn = tools.querySelector('#psmod-tiers');
@@ -7323,7 +7536,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
         e.stopPropagation();
         sortRev = d.dataset.d === '1'; save('dexSortRev', sortRev);
         NS.Audio && NS.Audio.sfx('click');
-        drawSort(); apply();
+        drawSort(); syncNative(); apply();
         if (padMode) { const on = sortPop.querySelector(`[data-d="${d.dataset.d}"]`); if (on) navSet(on); }
         return;
       }
@@ -7333,7 +7546,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
       sortKey = b.dataset.s; save('dexSort', sortKey);
       NS.Audio && NS.Audio.sfx('click');
       if (sortKey === 'tier' && !tierMap) loadTiers(false);
-      drawSort(); apply();
+      drawSort(); syncNative(); apply();
       if (padMode) { const on = sortPop.querySelector(`[data-s="${sortKey}"]`); if (on) navSet(on); }
     });
     document.addEventListener('click', (e) => { if (!e.target.closest('#psmod-sortwrap')) closeSort(); }, true);
@@ -7343,6 +7556,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
     if (dexScr) new MutationObserver(() => {
       if (!dexScr.classList.contains('hidden')) return;
       closeSort();
+      if (NEW) return;   // the game keeps its filters until you reload
       if (!input.value && !favOnly && fStatus === 'all' && !fRarity.size && dexApi && dexApi.isNational()) return;
       input.value = ''; favOnly = false; fStatus = 'all'; fRarity.clear();
       const fc = document.getElementById('psmod-favchip'); if (fc) fc.classList.remove('on');
@@ -7365,7 +7579,67 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
     const fRarity = new Set();
     let fAdopted = false;
     const star = (n) => (NS.Icons ? NS.Icons.html('star', n) : '★');
+    let morePending = false;
+    const applyNew = () => {
+      dex = dex || byNo();
+      const sv = (NS.DB && NS.DB.save) || {};
+      const chips = [...document.querySelectorAll('#dex-filters .chip')];
+      const shinyOn = !!(chips[3] && chips[3].classList.contains('on'));
+      const cells = [...grid.querySelectorAll('.cell')];
+      for (const cell of cells) {
+        const no = parseInt((cell.querySelector('.no') || {}).textContent, 10);
+        const fav = isFav(no);
+        let fb = cell.querySelector('.psmod-favb');
+        if (fav && !fb) { fb = document.createElement('span'); fb.className = 'psmod-favb'; fb.title = 'Favourite'; fb.innerHTML = star(12); cell.appendChild(fb); }
+        else if (!fav && fb) fb.remove();
+        const cv = cell.querySelector('canvas');
+        if (cv) spriteShiny(cv, !!(sv.shiny && sv.shiny[no]) && shinyOn);
+        const t = tierOf(no);
+        let tb = cell.querySelector('.psmod-tierb');
+        if (t && (!tb || tb.dataset.t !== t.tier)) { if (tb) tb.remove(); cell.insertAdjacentHTML('beforeend', tierBadge(t, 'psmod-tierb')); tb = cell.lastElementChild; tb.dataset.t = t.tier; }
+        else if (!t && tb) tb.remove();
+      }
+      if (!custom()) { grid.classList.remove('psm-sorting'); for (const c of cells) if (c.style.order) c.style.order = ''; return; }
+      // Ours counts as a filter for the game's Clear button too.
+      { const cl = document.getElementById('dex-clear'); if (cl) cl.classList.remove('hidden'); }
+      // Draw the rest a few batches per frame (so the music doesn't stutter),
+      // with the list hidden until it's all there and in order.
+      if (grid.querySelector('.dex-more')) {
+        grid.classList.add('psm-sorting');
+        grid.dataset.psmSorting = plusEsT('Sorting…');
+        if (!morePending) {
+          morePending = true;
+          requestAnimationFrame(() => { morePending = false; if (custom()) for (let i = 0; i < 4 && grid.querySelector('.dex-more'); i++) dexLoadAll1(); });
+        }
+        return;
+      }
+      grid.classList.remove('psm-sorting');
+      try {
+        const noOf = (c) => parseInt((c.querySelector('.no') || {}).textContent, 10);
+        let keyed;
+        if (sortKey === 'az') {
+          // Z→A: the game's A→Z the other way round, the ones you don't have (no name shown) still last.
+          const sv = (NS.DB && NS.DB.save) || {}, own = (c) => !!(sv.owned && sv.owned[noOf(c)]);
+          keyed = cells.map((c, i) => [c, own(c) ? -i : 1e6 + i, 0]).sort((a, b) => a[1] - b[1]);
+          keyed.forEach(([c], i) => { if (c.style.order !== String(i)) c.style.order = String(i); });
+          return;
+        }
+        if (NATIVE[sortKey]) keyed = cells.map((c, i) => [c, i, 0]);   // the game's order, the other way round
+        else {
+          const val = (c) => {
+            const no = noOf(c), p = dex.get(no) || {};
+            if (sortKey === 'tier') { const t = tierMap && tierMap.get(no); return t ? t.rank : 1e6 + no; }
+            return -(+p[sortKey] || 0);
+          };
+          keyed = cells.map((c) => [c, val(c), noOf(c)]);
+          keyed.sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : a[2] - b[2]));
+        }
+        if (sortRev) keyed.reverse();
+        keyed.forEach(([c], i) => { if (c.style.order !== String(i)) c.style.order = String(i); });
+      } catch (err) { trip('setupDexSort', err); }
+    };
     const apply = () => {
+      if (NEW) { applyNew(); return; }
       const q = input.value.trim().toLowerCase();
       // "shiny" (or "shinies"): every Pokémon whose shiny you have.
       const qShiny = /^shin(y|ies)$/.test(q);
@@ -7485,7 +7759,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
       markChips();
       apply();
     };
-    if (filters) {
+    if (filters && !NEW) {
       filters.addEventListener('click', (e) => {
         const c = e.target.closest('.chip');
         if (!c || c.id === 'psmod-favchip' || !filters.contains(c)) return;
@@ -7500,10 +7774,10 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
         markChips();
         apply();
       }, true);
-      new MutationObserver(() => { addChip(); onGameChips(); }).observe(filters, { childList: true });
+      if (!NEW) new MutationObserver(() => { addChip(); onGameChips(); }).observe(filters, { childList: true });
     }
-    addChip();
-    onGameChips();
+    if (!NEW) { addChip(); onGameChips(); }
+    else if (filters) filters.addEventListener('click', () => requestAnimationFrame(apply));
     // "Favourite" button on the detail panel (Pokémon you own).
     // The detail panel, rearranged from the game's own pieces (so its buttons
     // keep working): sprite beside the name with a ★ favourite toggle, then
@@ -7567,7 +7841,13 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
       // Sections.
       const sec = (title, cls) => { const d = document.createElement('div'); d.className = 'psd-sec ' + (cls || ''); d.innerHTML = `<h4>${title}</h4>`; return d; };
       const stats = [...detail.querySelectorAll(':scope > .stat')];
-      if (stats.length) { const d = sec('Base stats', 'psd-base'); stats.forEach((x) => d.appendChild(x)); head.after(d); }
+      if (stats.length) {
+        const d = sec('Base stats', 'psd-base'); stats.forEach((x) => d.appendChild(x));
+        // "Hits harder with physical/special moves", under the stats.
+        // (and "Monotype: +20% with its type's moves").
+        for (const side of detail.querySelectorAll(':scope > p.sub')) d.appendChild(side);
+        head.after(d);
+      }
       if (owned) {
         const lv = upgTotal(no), max = upgMax() || 90, rec = recordsFor(no);
         const tile = (k, v) => `<div><small>${k}</small><b>${v}</b></div>`;
@@ -7577,7 +7857,7 @@ html:not(.psmod-calm) #scr-menu .menu-item.play{animation:psmodPlayGlow 2.4s eas
             : '<p class="sub" style="grid-column:1/-1;margin:0">No runs with it yet: your records will show here.</p>'}</div>`);
         (detail.querySelector('.psd-sec.psd-base') || head).after(d);
       }
-      const startP = [...detail.querySelectorAll(':scope > p')].find((x) => !x.classList.contains('move-icons'));
+      const startP = [...detail.querySelectorAll(':scope > p')].find((x) => !x.classList.contains('move-icons') && !x.classList.contains('sub'));
       const icons = detail.querySelector(':scope > p.move-icons');
       if (startP || icons) {
         const d = sec('Moves', 'moves');
@@ -7845,7 +8125,9 @@ body:has(.scr.dim:not(.hidden)) #psmod-favwrap :is(.psmod-favarr,#psmod-favcount
       bar.hidden = !s;
       const sub = play.querySelector('small');
       play.classList.toggle('psm-wait', !!s && !s.room.isHost);
-      if (!s) { if (sub && sub.textContent !== PLAY_SUB) sub.textContent = PLAY_SUB; return; }
+      // (In Spanish the text is translated after it's written: that counts as the same.)
+      const same = (el, x) => el.textContent === x || el.textContent === plusEsT(x);
+      if (!s) { if (sub && !same(sub, PLAY_SUB)) sub.textContent = PLAY_SUB; return; }
       // The chat lives here while you're in a room.
       const chat = document.getElementById('psmod-lchat');
       if (chat && chat.parentElement !== bar) bar.appendChild(chat);
@@ -7856,11 +8138,11 @@ body:has(.scr.dim:not(.hidden)) #psmod-favwrap :is(.psmod-favarr,#psmod-favcount
       else if (s.failed.length) { txt = `Can’t connect to ${s.failed.map((m) => m.name).join(', ')} · retrying`; warn = true; }
       else if (s.connecting.length) { txt = `Connecting to ${s.connecting.map((m) => m.name).join(', ')}…`; warn = true; }
       else txt = `Your room · ${n}/${max} ready`;
-      if (status.textContent !== txt) status.textContent = txt;
+      if (!same(status, txt)) status.textContent = txt;
       status.classList.toggle('warn', warn);
       bar.querySelector('[data-a="invite"]').hidden = n >= max;   // anyone in the room can invite
       const want = !s.room.isHost ? `Waiting for ${s.host.name || 'the host'} to start` : n < 2 ? 'Play solo (leaves the room)' : `Start the co-op run (${n}/${max})`;
-      if (sub && sub.textContent !== want) sub.textContent = want;
+      if (sub && !same(sub, want)) sub.textContent = want;
     }
     // Play: start right here.
     play.addEventListener('click', async (e) => {
@@ -7882,6 +8164,9 @@ body:has(.scr.dim:not(.hidden)) #psmod-favwrap :is(.psmod-favarr,#psmod-favcount
     }, true);
     S.on(() => draw());
     setInterval(() => { const scr = document.getElementById('scr-menu'); if (scr && !scr.classList.contains('hidden')) draw(); }, 700);
+    // The game writes "Enter the dungeon" back under Play whenever the menu
+    // redraws: ours goes back before the screen is painted.
+    { const sub = play.querySelector('small'); if (sub) new MutationObserver(() => draw()).observe(sub, { childList: true, characterData: true, subtree: true }); }
     // Anything that still opens the room screen goes to the menu instead.
     const lobby = document.getElementById('scr-lobby');
     if (lobby) new MutationObserver(() => { if (!lobby.classList.contains('hidden')) { lobby.classList.add('hidden'); L.open(); } }).observe(lobby, { attributes: true, attributeFilter: ['class'] });
@@ -8287,6 +8572,7 @@ body:has(.scr.dim:not(.hidden)) #psmod-favwrap :is(.psmod-favarr,#psmod-favcount
     st.textContent = `
 #scr-menu .logo .t2.psmod-splash{display:inline-block;max-width:min(620px,92%);margin:8px auto 0;font-size:clamp(13px,2.6vh,23px);color:#ffe066;letter-spacing:.5px;text-transform:none;
   font-weight:700;line-height:1.2;text-shadow:2px 2px 0 var(--shadow,#0a1430);transform-origin:center;animation:psmodSplash 1.1s ease-in-out infinite alternate}
+#scr-menu .logo .t1 .splash{display:none!important}
 #scr-menu .logo .t2.psmod-splash.long{font-size:clamp(12px,2.2vh,19px)}
 #scr-menu .logo .t2.psmod-splash.xlong{font-size:clamp(11px,1.9vh,17px)}
 @keyframes psmodSplash{from{transform:scale(1)}to{transform:scale(1.07)}}
@@ -8295,11 +8581,15 @@ html.psmod-calm #scr-menu .logo .t2.psmod-splash{animation:none}
     document.head.appendChild(st);
     t2.classList.add('psmod-splash');
     t2.setAttribute('translate', 'no');
+    // Since 19 October 2026 the game has a line of its own on the title (in
+    // the player's language): it's hidden there and joins ours instead.
+    const gameLine = () => { const g = document.querySelector('#scr-menu .logo .t1 .splash'); return g && g.textContent.trim(); };
     const pick = () => {
-      let i = Math.floor(Math.random() * SPLASH.length);
-      if (i === splashLast) i = (i + 1) % SPLASH.length;
+      const pool = gameLine() ? SPLASH.concat([gameLine()]) : SPLASH;
+      let i = Math.floor(Math.random() * pool.length);
+      if (i === splashLast) i = (i + 1) % pool.length;
       splashLast = i;
-      const txt = SPLASH[i];
+      const txt = pool[i];
       t2.textContent = txt;
       t2.classList.toggle('long', txt.length > 28);
       t2.classList.toggle('xlong', txt.length > 38);
@@ -9070,6 +9360,58 @@ html.psmod-calm #psmod-plus{animation:none}`;
     save('endlessRec', rec);
     return beat;
   }
+
+  // ------------------------------------------------ game updates
+  // The game looks for a new version every few minutes. A "must update"
+  // version would end your run after 10 s; with PokeSurvivor Plus the run
+  // carries on: you're told an update is out and that this run won't go on
+  // the leaderboard, and the game updates once you're back at the menu.
+  let updAvail = false, updRun = false;
+  const inRunNow = () => !!(NS && NS.Game && NS.Game.state && NS.Game.state !== 'ui' && NS.Game.state !== 'over');
+  function gameUpdateSeen() {
+    if (updAvail) return;
+    updAvail = true;
+    if (!inRunNow()) return;   // at the menu the game updates by itself, as before
+    updRun = true;
+    toast('A game update is available', '#ffcb3d', 'Your run carries on, but it won’t go on the leaderboard. The game updates when you’re back at the menu.', 12000);
+  }
+  try {
+    const realFetch = window.fetch;
+    if (typeof realFetch === 'function') {
+      window.fetch = function (url) {
+        const u = typeof url === 'string' ? url : url && url.url;
+        const p = realFetch.apply(this, arguments);
+        if (!u || !/(^|\/)version\.json(\?|$)/.test(u)) return p;
+        return p.then(async (r) => {
+          try {
+            if (!r.ok) return r;
+            const j = await r.clone().json();
+            const mine = NS && NS.Updater && NS.Updater.version;
+            if (!j || !j.v || !mine || j.v === mine) return r;
+            gameUpdateSeen();
+            if (!j.force) return r;
+            const k = Object.assign({}, j); delete k.force;
+            return new Response(JSON.stringify(k), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          } catch (_) { return r; }
+        });
+      };
+    }
+  } catch (_) { /* the game's own */ }
+  waitFor(() => NS && NS.Ranking && NS.Ranking.runStarted && NS.Ranking.submitSolo && NS.Ranking.submitGroup && document.getElementById('over-stats'), function gameUpdates() {
+    const R = NS.Ranking, started = R.runStarted, solo = R.submitSolo, group = R.submitGroup;
+    R.runStarted = function () { updRun = updAvail; if (updRun) return null; return started.apply(this, arguments); };
+    R.submitSolo = function () { if (updRun) return null; return solo.apply(this, arguments); };
+    R.submitGroup = function () { if (updRun) return null; return group.apply(this, arguments); };
+    const box = document.getElementById('over-stats');
+    new MutationObserver(() => {
+      if (!updRun || !box.children.length || box.querySelector('.psm-upd-line')) return;
+      const line = document.createElement('div');
+      line.className = 'psm-upd-line';
+      line.style.cssText = 'font-size:12px;color:#ffcb3d;margin:2px 0 6px';
+      line.textContent = 'The game was updated during this run: it isn’t on the leaderboard. The new version loads at the menu.';
+      box.prepend(line);
+    }).observe(box, { childList: true });
+  }, 'gameUpdates');
 
   function setupEndless() {
     const R = NS.Ranking, J = NS.Judgment, E = NS.Enemies, A = NS.AchDefs;
@@ -10542,6 +10884,8 @@ html.psmod-fpsdefault #psmod-np{bottom:40px}`;
 #prof-body .psp-favs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 #prof-body .psp-fav{display:grid;justify-items:center;gap:4px;padding:10px 6px 8px;border-radius:12px;background:rgba(0,0,0,.25);border:2px solid rgba(255,210,63,.45);text-align:center;position:relative}
 #prof-body .psp-fav img{width:72px;height:72px;border-radius:12px;image-rendering:pixelated;border:2px solid var(--edge,#f4f8ff);background:rgba(95,200,255,.18)}
+#prof-body .psp-fav .psp-spr{display:grid;place-items:center;width:100%;min-height:84px}
+#prof-body .psp-fav .psp-spr canvas{width:min(100%,120px);height:auto;image-rendering:pixelated}
 #prof-body .psp-fav b{font-size:14px}
 #prof-body .psp-fav .types{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;transform:scale(.85)}
 #prof-body .psp-fav .psmod-tier{position:absolute;top:6px;right:6px}
@@ -10601,7 +10945,7 @@ html.psmod-fpsdefault #psmod-np{bottom:40px}`;
         const mon = NS.DEX_BY[f.dex], t = tierMap && tierMap.get(+f.dex);
         let types = ''; try { types = NS.UI.typeChips(mon.types); } catch (_) { types = ''; }
         return `<div class="psp-fav${f.shiny ? ' sh' : ''}">${f.shiny ? '<span class="shm" title="Shiny">✦</span>' : ''}${t ? tierBadge(t) : ''}
-          <img src="${portrait(f.dex, f.shiny)}" alt="" data-dex="${f.dex}"><b translate="no">${esc(tr(mon.name))}</b><span class="types">${types}</span></div>`;
+          <span class="psp-spr" data-dex="${f.dex}" data-sh="${f.shiny ? 1 : 0}"></span><b translate="no">${esc(tr(mon.name))}</b><span class="types">${types}</span></div>`;
       }).join('') : '<p class="psp-none">No favourites picked yet.</p>'}</div>
       <h3 class="psp-h">Records</h3>
       <div class="psp-stats">
@@ -10614,6 +10958,10 @@ html.psmod-fpsdefault #psmod-np{bottom:40px}`;
         <div><span class="ic"><img src="${skullIcon().toDataURL()}" width="22" height="22" alt="" style="image-rendering:pixelated"></span><small>Pokémon defeated</small><b>${fmt(b.kills || 0)}</b></div>
       </div>`;
     if (medH && med) { medH.classList.add('psp-h'); body.append(medH, med); }
+    // The favourites as they look in a run (the picture by the name stays a portrait).
+    for (const el of body.querySelectorAll('.psp-spr')) {
+      try { el.appendChild(NS.UI.spriteCanvas(+el.dataset.dex, 120, 100, { scale: 2, lively: true, shiny: el.dataset.sh === '1' })); } catch (_) { /* no sprite */ }
+    }
     // Missing shiny portrait → normal one → the game's sprite.
     for (const img of body.querySelectorAll('img[data-dex]')) {
       img.onerror = () => {
@@ -10710,10 +11058,12 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
   "(non-standard layout: rebind below if buttons seem wrong)": "(distribución no estándar: reasigna abajo si los botones no cuadran)",
   "+{x} health/s": "+{x} vida/s",
   "A Pokémon joining your team, and shinies you got.": "Un Pokémon que se une a tu equipo y los shinies que consigues.",
+  "A game update is available": "Hay una actualización del juego",
   "A line in the chat for each teammate’s ping (“Mira: Help!”).": "Una línea en el chat por cada aviso de un compañero («Mira: ¡Ayuda!»).",
   "A line in the chat for each teammate’s ping.": "Una línea en el chat por cada aviso de un compañero.",
   "A notice (and sparkle) when a shiny shows up, with where it is.": "Un aviso (y un destello) cuando aparece un shiny, con dónde está.",
   "A notice when someone in co-op goes down.": "Un aviso cuando alguien cae en cooperativo.",
+  "A picture of this run to paste in your chat": "Una imagen de esta partida para pegar en tu chat",
   "A quick look at what it adds. Six cards, about thirty seconds. On a controller: A next, B skip.": "Un vistazo rápido a lo que añade. Seis tarjetas, unos treinta segundos. Con mando: A siguiente, B saltar.",
   "A short sound for each ping, different for Help, Boss, Chest and Here.": "Un sonido corto para cada aviso, distinto para Ayuda, Jefe, Cofre y Aquí.",
   "A short sound for each ping.": "Un sonido corto para cada aviso.",
@@ -10726,6 +11076,7 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
   "Achievements": "Logros",
   "Action": "Acción",
   "Add to favourites (swap to it from the main menu)": "Añadir a favoritos (cámbiate a él desde el menú principal)",
+  "Aiming": "Apuntado",
   "Alert sound": "Sonido de alerta",
   "Alert sound off": "Sonido de alerta desactivado",
   "Alert sound on": "Sonido de alerta activado",
@@ -10979,6 +11330,7 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
   "Fury": "Furia",
   "Gacha buttons": "Botones del gacha",
   "Game parts it uses were not found": "No se encontraron partes del juego que usa",
+  "Game updates without ending your run": "Actualizaciones del juego sin acabar tu partida",
   "Ghost": "Fantasma",
   "Golden & thieves": "Dorados y ladrones",
   "Gradient": "Degradado",
@@ -11094,6 +11446,7 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
   "Magnet": "Imán",
   "Magnet{x}": "Imán{x}",
   "Main menu splash text": "Frases del menú principal",
+  "Manual aim": "Apuntar a mano",
   "Max all upgrades": "Mejorar todo al máximo",
   "Max all · {x}": "Todo al máx. · {x}",
   "Max stacks": "Acumulación máx.",
@@ -11118,6 +11471,7 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
   "More music (playing)": "Más música (reproducción)",
   "Most damage": "Más daño",
   "Most defeated": "Más derrotados",
+  "Most used": "Más usados",
   "Motion": "Movimiento",
   "Mouse": "Ratón",
   "Mouse back": "Ratón atrás",
@@ -11139,6 +11493,7 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
   "New record with {x}!": "¡Nuevo récord con {x}!",
   "New records": "Nuevos récords",
   "New tracks in the game’s style: five more for the menu, four more for each area, five more for boss fights, two more for Arceus’s Judgment, and three for each family of rift arenas, picked at random as you move between them.{x}": "Temas nuevos al estilo del juego: cinco más para el menú, cuatro más para cada zona, cinco más para los jefes, dos más para la Sentencia de Arceus y tres para cada familia de arenas de grieta, elegidos al azar al pasar de una a otra.{x}",
+  "Newest": "Recién conseguidos",
   "Next": "Siguiente",
   "Next attack": "Ataque siguiente",
   "Next favourite:": "Favorito siguiente:",
@@ -11176,6 +11531,7 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
   "Offline · last seen": "Desconectado · visto",
   "On": "Sí",
   "On PC": "En PC",
+  "One controller setup (the game’s own kept quiet)": "Un solo sistema de mando (el del juego, en silencio)",
   "Online": "En línea",
   "Only how they look: hit areas don't change.": "Sólo cómo se ven: las zonas de golpe no cambian.",
   "Only players with PokeSurvivor Plus see the chat.": "Sólo los jugadores con PokeSurvivor Plus ven el chat.",
@@ -11201,6 +11557,7 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
   "Pause during level-up": "Pausa al subir de nivel",
   "Pause for everyone": "Pausa para todos",
   "Pause menu and settings (the cards wait for you)": "Menú de pausa y ajustes (las cartas te esperan)",
+  "Pause ·": "Pausa ·",
   "Pause · {x}": "Pausa · {x}",
   "Paused by the host.": "En pausa por el anfitrión.",
   "Paused by vote.": "En pausa por votación.",
@@ -11209,6 +11566,7 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
   "Paused: … is choosing": "En pausa: … está eligiendo",
   "Pausing for everyone needs the host to have PokeSurvivor Plus.": "Pausar para todos necesita que el anfitrión tenga PokeSurvivor Plus.",
   "Percent": "Porcentaje",
+  "Physical": "Físico",
   "Pierce": "Atraviesa",
   "Ping (hold for wheel)": "Aviso (mantén para la rueda)",
   "Ping sounds": "Sonidos de avisos",
@@ -11260,6 +11618,7 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
   "Rainbow and moving bars hold still, the logo stops glowing and previews stop moving.": "Las barras arcoíris y en movimiento se quedan quietas, el logo deja de brillar y las vistas previas se paran.",
   "Range": "Alcance",
   "Rank": "Puesto",
+  "Rarity": "Rareza",
   "Reconnecting… (up to {x} s)": "Reconectando… (hasta {x} s)",
   "Records": "Récords",
   "Red": "Rojo",
@@ -11339,9 +11698,11 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
   "Small": "Pequeña",
   "Solo run": "Partida en solitario",
   "Sort: {x} · {x} ▾": "Orden: {x} · {x} ▾",
+  "Sorting…": "Ordenando…",
   "Sound": "Sonido",
   "Space": "Espacio",
   "Spanish": "Español",
+  "Special": "Especial",
   "Spectate while down": "Mirar mientras estás caído",
   "Speed": "Velocidad",
   "Speed boost": "Aumento de velocidad",
@@ -11400,6 +11761,7 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
   "The game goes on.": "La partida sigue.",
   "The game reloads when you change it.": "El juego se recarga al cambiarlo.",
   "The game seems to have changed. The rest keeps working · Settings → Extras → Status": "El juego parece haber cambiado. El resto sigue funcionando · Ajustes → Extras → Estado",
+  "The game was updated during this run: it isn’t on the leaderboard. The new version loads at the menu.": "El juego se actualizó durante esta partida: no va al ranking. La versión nueva se carga en el menú.",
   "The game’s achievement pop-ups at the top of the screen.": "Los avisos de logros del juego arriba de la pantalla.",
   "The game’s notice when a run gets a new best on the leaderboard.": "El aviso del juego cuando una partida consigue una nueva marca en el ranking.",
   "The host paused the game for everyone.": "El anfitrión ha pausado la partida para todos.",
@@ -11491,6 +11853,7 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
   "You were removed from the room": "Te han echado de la sala",
   "You ·": "Tú ·",
   "Your attacks": "Tus ataques",
+  "Your attacks go toward the mouse (or where you push the right stick) instead of the nearest enemy. Let go of the stick without moving the mouse and it aims by itself again. Chain and meteors still find enemies on their own (the game’s own setting).": "Tus ataques van hacia el ratón (o hacia donde empujes el stick derecho) en vez de al enemigo más cercano. Si sueltas el stick sin mover el ratón, vuelve a apuntar solo. La cadena y los meteoros siguen buscando a los enemigos solos (el ajuste del propio juego).",
   "Your attacks · opacity": "Tus ataques · opacidad",
   "Your attacks · size": "Tus ataques · tamaño",
   "Your best damage per second": "Tu mejor daño por segundo",
@@ -11503,6 +11866,7 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
   "Your moves recharge 40% faster.": "Tus movimientos se recargan un 40% más rápido.",
   "Your room · invite friends to play together": "Tu sala · invita a tus amigos para jugar juntos",
   "Your room · {x}/{x} ready": "Tu sala · {x}/{x} listos",
+  "Your run carries on, but it won’t go on the leaderboard. The game updates when you’re back at the menu.": "Tu partida sigue, pero no irá al ranking. El juego se actualiza cuando vuelvas al menú.",
   "Your runs, records and the leaderboard (Alt + H)": "Tus partidas, récords y el ranking (Alt + H)",
   "Your totals, every run with a damage graph and a share card, personal records for each Pokémon, and the leaderboard.": "Tus totales, cada partida con su gráfica de daño y tarjeta para compartir, récords de cada Pokémon y el ranking.",
   "Your view · {x}x": "Tu vista · {x}x",
@@ -11516,23 +11880,29 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
   "best damage/s": "mejor daño/s",
   "best→worst": "mejor→peor",
   "button under Play (the gold Play button starts a normal run). Arceus’s Judgment doesn’t come at 30:00: the run goes on like before the Judgment existed (from minute 60 enemies toughen faster and faster), rifts keep opening and a boss comes every 3 minutes. Summon Arceus from the pause menu to end it (the host, in co-op). Endless runs never go on the leaderboard, don’t unlock achievements and don’t change your game stats (best time, best level…); coins and tickets as usual. Their records are in Stats.": "bajo Jugar (el botón dorado Jugar empieza una partida normal). La Sentencia de Arceus no llega a los 30:00: la partida sigue como antes de que existiera (desde el minuto 60 los enemigos se hacen más duros cada vez más rápido), siguen abriéndose grietas y llega un jefe cada 3 minutos. Invoca a Arceus desde el menú de pausa para acabarla (el anfitrión, en cooperativo). Las partidas infinitas nunca van al ranking, no desbloquean logros ni cambian tus estadísticas del juego (mejor tiempo, mejor nivel…); monedas y tickets como siempre. Sus récords están en Estadísticas.",
+  "commonest first": "más comunes primero",
   "damage taken": "daño recibido",
   "days ago": "días",
   "everyone stops": "todos se paran",
   "h ago": "h",
   "highest level": "nivel más alto",
   "high→low": "alto→bajo",
+  "least first": "menos usados primero",
   "less shake": "menos temblores",
   "longest run": "partida más larga",
   "low→high": "bajo→alto",
   "min ago": "min",
   "most damage": "más daño",
   "most defeated": "más derrotados",
+  "most first": "más usados primero",
   "needs help! ·": "¡necesita ayuda! ·",
   "new best on the leaderboard": "nueva marca en el ranking",
+  "newest first": "más nuevos primero",
   "no mod": "sin mod",
   "not a PokeSurvivor Plus settings file": "no es un archivo de ajustes de PokeSurvivor Plus",
   "of {x} ·": "de {x} ·",
+  "oldest first": "más antiguos primero",
+  "rarest first": "más raros primero",
   "slot {x}": "hueco {x}",
   "survivortiers.pages.dev didn’t answer. Try again later.": "survivortiers.pages.dev no responde. Prueba más tarde.",
   "the file is empty": "el archivo está vacío",
@@ -11673,6 +12043,24 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
   // PokeSurvivor Plus's, with every past version. The button's dot also
   // lights up when PokeSurvivor Plus was updated.
   const PLUS_NEWS = [
+    { v: '1.5', d: '19 October 2026',
+      new: ['Works with the game’s 18 and 19 October updates. Where the game now does something PokeSurvivor Plus already did, there is one of each: the game’s search, type and filters on the Pokémon screen with Plus’s sorting, one set of favourites (the game’s, saved with your account; the ones you had are added to it), and Plus’s controller support (the game’s own is kept quiet; its Manual aim works with your right stick).',
+        'A game update no longer ends your run: you’re told it’s out and that this run won’t go on the leaderboard, and the game updates once you’re back at the menu.',
+        'Share card on the game-over screen, beside Back to menu, with Runs & records under them.',
+        'Level-up cards show what a move does right on the card: a new move’s numbers, or what changes when it levels up.'],
+      chg: ['The Pokémon screen’s “All” tab is the National tab, and the list draws as you scroll, so opening it is smoother.',
+        'Shiny twinkles are a little more noticeable.',
+        'After a rift you’re safe for 1 second and flash while it lasts.',
+        'HUD size goes down to 0.5×.',
+        'Favourite Pokémon on profiles (yours and friends’) are shown as they look in a run; the picture by the name stays a portrait of the first one.',
+        'The game’s Manual aim is in Settings → Accessibility, and the game’s Save button sits top left beside Support.',
+        'The level-up Pause button shows its key (or controller button) like the other prompts.',
+        'Move details count physical and special moves, which hit with Attack or Sp. Atk.',
+        'Settings → Accessibility → Language lists every language the game has (Français, Italiano, Português, 中文 too). PokeSurvivor Plus’s own menus are in English or Spanish.',
+        'The game’s new line on the title joins PokeSurvivor Plus’s splash texts instead of showing twice.',
+        'Upgrades: the new Starting move card keeps its size (its Choose button sits under the bar, like Ban), and its list opens right under the cards.'],
+      fix: ['The Play button no longer flashes “Enter the dungeon” when you open a menu.',
+        'Endless pause menu with a controller: right from Continue goes to Settings, then Quit run, then Summon Arceus.'] },
     { v: '1.4', d: '18 October 2026',
       new: ['Create a room without inviting anyone: Friends → Create room. It gets a short 6-digit code (like 482 913) to share, shown right away.',
         'Co-op level-up: you can change your card until everyone has chosen.',
@@ -11892,7 +12280,7 @@ html:not(.psmod-calm) #scr-gacha #pull-10b:not(:disabled){animation:psmodPremium
     if (document.getElementById('psmod-topbar-css')) return;
     const st = document.createElement('style');
     st.id = 'psmod-topbar-css';
-    const B = '#topbar :is(#btn-news,#btn-sound,#btn-full,#btn-settings)';
+    const B = '#topbar :is(#btn-news,#btn-sound,#btn-full,#btn-settings,#btn-save)';
     st.textContent = `
 ${B}{transition:transform .08s,filter .15s,border-color .15s,box-shadow .15s}
 ${B}:is(:hover,.psmod-padfocus){transform:scale(1.08);filter:brightness(1.15);border-color:var(--gold,#ffd23f);box-shadow:0 0 10px rgba(255,210,63,.55)}
@@ -11902,8 +12290,21 @@ ${B}:is(:hover,.psmod-padfocus) img{filter:drop-shadow(0 0 4px rgba(255,230,140,
 #user-pill{cursor:pointer;transition:transform .08s,border-color .15s,box-shadow .15s}
 #user-pill:hover{transform:scale(1.05);border-color:var(--gold,#ffd23f);box-shadow:0 0 10px rgba(255,210,63,.45)}
 #user-pill:active{transform:scale(.96)}
-#psmod-logout{margin:16px 0 0 8px}`;
+#psmod-logout{margin:16px 0 0 8px}
+#topbar #btn-save{position:fixed;top:14px;left:var(--psm-save-x,16px)}`;
     document.head.appendChild(st);
+    // The game's Save button (accounts saved online) sits top left beside
+    // Support, away from the coins, your name and the icon buttons.
+    const placeSave = () => {
+      const sv = document.getElementById('btn-save'), sup = document.getElementById('btn-support');
+      if (!sv || sv.classList.contains('hidden')) return;
+      const r = sup && !sup.classList.contains('hidden') ? sup.getBoundingClientRect() : null;
+      const x = r && r.width ? Math.round(r.right + 10) + 'px' : '16px';
+      if (sv.style.getPropertyValue('--psm-save-x') !== x) sv.style.setProperty('--psm-save-x', x);
+    };
+    setInterval(placeSave, 1000);
+    addEventListener('resize', placeSave);
+    { const sv = document.getElementById('btn-save'); if (sv) new MutationObserver(placeSave).observe(sv, { attributes: true, attributeFilter: ['class'] }); }
     // No crown (the game redraws the pill, so it goes again each time).
     const pill = document.getElementById('user-pill');
     const noCrown = () => {

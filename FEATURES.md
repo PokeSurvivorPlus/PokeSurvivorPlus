@@ -18,7 +18,7 @@ Everything PokeSurvivor Plus adds to [PokéSurvivor](https://pokesurvivor.com/).
 - **Room on the main menu (co-op):** while you're in a room, the party, the room's status, its chat and Invite / Leave room sit under your partner. **Play** starts the co-op run for everyone (host), says who you're waiting for (guest), or plays solo if you're alone.
 - **Party strip:** in a group, a strip under your partner shows every member, the Pokémon they picked and its upgrade level (★ host, ✦ shiny).
 - A different **splash text** (over a hundred) pulses under the logo each time you come back, and the Pokémon wandering behind the menu are sometimes shiny (about 1 in 64).
-- The version (“PokeSurvivor Plus v1.4”) sits at the bottom left; click it for what's new. A **Now playing** card slides in at the bottom right when a new song starts.
+- The version (“PokeSurvivor Plus v1.5”) sits at the bottom left; click it for what's new. A **Now playing** card slides in at the bottom right when a new song starts.
 - The menu scales down to fit short windows.
 
 ## Endless runs
@@ -50,7 +50,7 @@ The purple **∞ Endless** button starts an endless run; the gold **Play** butto
 - **Down and revives:** when you're down, the screen edge pulses red and a panel shows who can revive you and the revive progress; reviving someone shows a bar.
 - **Big chests:** a clear opening meter with the percentage instead of the game's thin ring.
 - Portraits come from SpriteCollab, the artwork source the game uses for its sprites: a normal face, a pained face after a real hit and a dizzy one when down.
-- The HUD scales from 1× to 2× (default 1.4×). Switch back to the game's original with Settings → HUD & UI → HUD style → Classic (touch screens always use the original). The clock panel, rift, thief and boss extras need the new HUD.
+- The HUD scales from 0.5× to 2× (default 1.4×). Switch back to the game's original with Settings → HUD & UI → HUD style → Classic (touch screens always use the original). The clock panel, rift, thief and boss extras need the new HUD.
 
 ## Damage meter and upgrades panel
 

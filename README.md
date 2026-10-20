@@ -7,7 +7,7 @@
 **A free browser extension that makes [PokéSurvivor](https://pokesurvivor.com/) better:**<br>
 Endless runs, co-op rooms of up to 8 with room codes, a redesigned HUD, a damage meter, a minimap, full controller support, co-op chat & pings, Spanish, and dozens of quality-of-life upgrades.
 
-[![Version 1.4.0](https://img.shields.io/badge/version-1.4.0-ffd23f?style=for-the-badge)](https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/releases/latest)
+[![Version 1.5.0](https://img.shields.io/badge/version-1.5.0-ffd23f?style=for-the-badge)](https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/releases/latest)
 [![Chromium browsers](https://img.shields.io/badge/browsers-Chromium-3461b8?style=for-the-badge)](INSTALL.md)
 [![Available on the Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-available-7b4ae0?style=for-the-badge&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/pokesurvivor-plus/deobgjkejfjknofekpfccfbghgbhiidn)
 [![MIT licence](https://img.shields.io/badge/licence-MIT-46c96a?style=for-the-badge)](LICENSE)
@@ -125,7 +125,7 @@ Updates install automatically. The store page also works in **Edge**, **Brave** 
 
 ### Manual install (zip)
 
-Prefer to load it yourself, or want a release before it reaches the store? Download **`pokesurvivor-plus-1.4.0.zip`** from the [latest release](https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/releases/latest), extract it, open your browser's extensions page, turn on **Developer mode**, click **Load unpacked** and pick the extracted folder. Don't keep both versions switched on at once.
+Prefer to load it yourself, or want a release before it reaches the store? Download **`pokesurvivor-plus-1.5.0.zip`** from the [latest release](https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/releases/latest), extract it, open your browser's extensions page, turn on **Developer mode**, click **Load unpacked** and pick the extracted folder. Don't keep both versions switched on at once.
 
 Works in **Chromium-based desktop browsers** (Chrome, Edge, Brave, Opera…). Firefox, Safari and mobile aren't supported yet. Step-by-step help, updating and troubleshooting: **[INSTALL.md](INSTALL.md)**.
 

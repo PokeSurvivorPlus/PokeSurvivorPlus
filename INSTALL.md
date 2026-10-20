@@ -49,8 +49,8 @@ Use this if you'd rather load the extension yourself, or want a GitHub release b
 ### 1. Download
 
 1. Go to the [latest release](https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/releases/latest).
-2. Under **Assets**, download **`pokesurvivor-plus-1.4.0.zip`** (not the “Source code” files).
-3. Extract (unzip) it. You get a folder called **`pokesurvivor-plus-1.4.0`** with `manifest.json` inside.
+2. Under **Assets**, download **`pokesurvivor-plus-1.5.0.zip`** (not the “Source code” files).
+3. Extract (unzip) it. You get a folder called **`pokesurvivor-plus-1.5.0`** with `manifest.json` inside.
 4. Move that folder somewhere permanent, such as your Documents folder. **Don't delete it later:** the browser loads the extension from this folder.
 
 ### 2. Load it in your browser
@@ -60,25 +60,25 @@ Use this if you'd rather load the extension yourself, or want a GitHub release b
 1. Open a new tab and go to `chrome://extensions`.
 2. Turn on **Developer mode** (switch at the top right).
 3. Click **Load unpacked**.
-4. Select the **`pokesurvivor-plus-1.4.0`** folder (the one that contains `manifest.json`) and confirm.
+4. Select the **`pokesurvivor-plus-1.5.0`** folder (the one that contains `manifest.json`) and confirm.
 
 #### Microsoft Edge
 
 1. Go to `edge://extensions`.
 2. Turn on **Developer mode** (in the left-hand panel; on narrow windows, open the menu ☰ first).
-3. Click **Load unpacked** and select the **`pokesurvivor-plus-1.4.0`** folder.
+3. Click **Load unpacked** and select the **`pokesurvivor-plus-1.5.0`** folder.
 
 #### Brave
 
 1. Go to `brave://extensions`.
 2. Turn on **Developer mode** (top right).
-3. Click **Load unpacked** and select the **`pokesurvivor-plus-1.4.0`** folder.
+3. Click **Load unpacked** and select the **`pokesurvivor-plus-1.5.0`** folder.
 
 #### Opera
 
 1. Go to `opera://extensions`.
 2. Turn on **Developer mode** (top right).
-3. Click **Load unpacked** and select the **`pokesurvivor-plus-1.4.0`** folder.
+3. Click **Load unpacked** and select the **`pokesurvivor-plus-1.5.0`** folder.
 
 #### Other Chromium browsers
 

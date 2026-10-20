@@ -2,6 +2,34 @@
 
 All notable changes to PokeSurvivor Plus, newest first. This is the same history as the **What's new → PokeSurvivor Plus** tab inside the extension.
 
+## 1.5.0 — 19 October 2026
+
+### Added
+
+- Works with the game’s 18 and 19 October updates. Where the game now does something PokeSurvivor Plus already did, there is one of each: the game’s search, type and filters on the Pokémon screen with Plus’s sorting, one set of favourites (the game’s, saved with your account; the ones you had are added to it), and Plus’s controller support (the game’s own is kept quiet; its Manual aim works with your right stick).
+- A game update no longer ends your run: you’re told it’s out and that this run won’t go on the leaderboard, and the game updates once you’re back at the menu.
+- Share card on the game-over screen, beside Back to menu, with Runs & records under them.
+- Level-up cards show what a move does right on the card: a new move’s numbers, or what changes when it levels up.
+
+### Changed
+
+- The Pokémon screen’s “All” tab is the National tab, and the list draws as you scroll, so opening it is smoother.
+- Shiny twinkles are a little more noticeable.
+- After a rift you’re safe for 1 second and flash while it lasts.
+- HUD size goes down to 0.5×.
+- Favourite Pokémon on profiles (yours and friends’) are shown as they look in a run; the picture by the name stays a portrait of the first one.
+- The game’s Manual aim is in Settings → Accessibility, and the game’s Save button sits top left beside Support.
+- The level-up Pause button shows its key (or controller button) like the other prompts.
+- Move details count physical and special moves, which hit with Attack or Sp. Atk.
+- Settings → Accessibility → Language lists every language the game has (Français, Italiano, Português, 中文 too). PokeSurvivor Plus’s own menus are in English or Spanish.
+- The game’s new line on the title joins PokeSurvivor Plus’s splash texts instead of showing twice.
+- Upgrades: the new Starting move card keeps its size (its Choose button sits under the bar, like Ban), and its list opens right under the cards.
+
+### Fixed
+
+- The Play button no longer flashes “Enter the dungeon” when you open a menu.
+- Endless pause menu with a controller: right from Continue goes to Settings, then Quit run, then Summon Arceus.
+
 ## 1.4.0 — 18 October 2026
 
 ### Added
