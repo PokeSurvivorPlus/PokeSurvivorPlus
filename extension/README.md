@@ -75,6 +75,14 @@ A browser extension for [pokesurvivor.com](https://pokesurvivor.com/) (formerly 
 
 To update, replace the folder's contents with the new version and click the reload arrow on the extension's card in `chrome://extensions`.
 
+## Install (Firefox)
+
+1. Open `about:debugging#/runtime/this-firefox`.
+2. Click **Load Temporary Add-on** and pick the build's `.xpi` file (or the unpacked folder's `manifest.json`).
+3. Reload pokesurvivor.com.
+
+Temporary loads are removed when Firefox closes. For a permanent install the add-on needs to be signed, or you can disable signature checking in Firefox ESR / Developer / Nightly. To update a temporary load, install the new version the same way.
+
 ## Controls
 
 | Action | How |

@@ -1,6 +1,14 @@
+// In Firefox the "chrome" namespace is callback-based, so use "browser"
+// (promises). In Chrome MV3 "browser" is an alias for "chrome"; the typeof
+// guard covers environments where the alias is missing.
+/* global browser */
+const Browser = (typeof browser !== 'undefined') ? browser : chrome;
+
 // PokeSurvivor Plus background worker.
-//  - Keeps game tabs from being discarded by Chrome's memory saver, which
+//  - Keeps game tabs from being discarded by the browser's memory saver, which
 //    reloads the page and drops you out of a co-op run without any message.
+//    (Chrome-only in practice: Firefox has no memory saver and ignores the
+//    autoDiscardable update; the swallowed error makes it a no-op there.)
 //  - "Quit" on the main menu: closes the game tab (a page can't close a tab
 //    it didn't open itself).
 //  - Tier list badges: downloads the public ranking CSV from SurvivorTiers
@@ -40,13 +48,13 @@ function parseTiers(text) {
   return rows;
 }
 
-chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+Browser.runtime.onMessage.addListener((msg, sender, reply) => {
   if (!msg || typeof msg.psmod !== 'string') return;
   const tab = sender.tab && sender.tab.id != null ? sender.tab.id : null;
   if (msg.psmod === 'nodiscard' && tab != null) {
-    chrome.tabs.update(tab, { autoDiscardable: false }).catch(() => {});
+    Browser.tabs.update(tab, { autoDiscardable: false }).catch(() => {});
   } else if (msg.psmod === 'closeTab' && tab != null) {
-    chrome.tabs.remove(tab).catch(() => {});
+    Browser.tabs.remove(tab).catch(() => {});
   } else if (msg.psmod === 'tiers') {
     fetch(TIERS_CSV, { cache: 'no-cache', credentials: 'omit' })
       .then((r) => (r.ok ? r.text() : Promise.reject(new Error('HTTP ' + r.status))))
