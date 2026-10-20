@@ -2,8 +2,8 @@
 
 PokeSurvivor Plus is a browser extension for [pokesurvivor.com](https://pokesurvivor.com/).
 
-**Supported:** Chromium-based desktop browsers — Google Chrome, Microsoft Edge, Brave, Opera and others built on Chromium.
-**Not supported yet:** Firefox, Safari and mobile browsers.
+**Supported:** Chromium-based desktop browsers — Google Chrome, Microsoft Edge, Brave, Opera and others built on Chromium — and Firefox-based desktop browsers: Firefox, Zen and forks built on Firefox.
+**Not supported yet:** Safari and mobile browsers.
 
 - [Option A: Chrome Web Store (recommended)](#option-a-chrome-web-store-recommended)
 - [Option B: Manual install from the zip](#option-b-manual-install-from-the-zip)
@@ -49,8 +49,8 @@ Use this if you'd rather load the extension yourself, or want a GitHub release b
 ### 1. Download
 
 1. Go to the [latest release](https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/releases/latest).
-2. Under **Assets**, download **`pokesurvivor-plus-1.5.0.zip`** (not the “Source code” files).
-3. Extract (unzip) it. You get a folder called **`pokesurvivor-plus-1.5.0`** with `manifest.json` inside.
+2. Under **Assets**, download **`pokesurvivor-plus-1.5.1.zip`** (not the “Source code” files).
+3. Extract (unzip) it. You get a folder called **`pokesurvivor-plus-1.5.1`** with `manifest.json` inside.
 4. Move that folder somewhere permanent, such as your Documents folder. **Don't delete it later:** the browser loads the extension from this folder.
 
 ### 2. Load it in your browser
@@ -60,29 +60,41 @@ Use this if you'd rather load the extension yourself, or want a GitHub release b
 1. Open a new tab and go to `chrome://extensions`.
 2. Turn on **Developer mode** (switch at the top right).
 3. Click **Load unpacked**.
-4. Select the **`pokesurvivor-plus-1.5.0`** folder (the one that contains `manifest.json`) and confirm.
+4. Select the **`pokesurvivor-plus-1.5.1`** folder (the one that contains `manifest.json`) and confirm.
 
 #### Microsoft Edge
 
 1. Go to `edge://extensions`.
 2. Turn on **Developer mode** (in the left-hand panel; on narrow windows, open the menu ☰ first).
-3. Click **Load unpacked** and select the **`pokesurvivor-plus-1.5.0`** folder.
+3. Click **Load unpacked** and select the **`pokesurvivor-plus-1.5.1`** folder.
 
 #### Brave
 
 1. Go to `brave://extensions`.
 2. Turn on **Developer mode** (top right).
-3. Click **Load unpacked** and select the **`pokesurvivor-plus-1.5.0`** folder.
+3. Click **Load unpacked** and select the **`pokesurvivor-plus-1.5.1`** folder.
 
 #### Opera
 
 1. Go to `opera://extensions`.
 2. Turn on **Developer mode** (top right).
-3. Click **Load unpacked** and select the **`pokesurvivor-plus-1.5.0`** folder.
+3. Click **Load unpacked** and select the **`pokesurvivor-plus-1.5.1`** folder.
 
 #### Other Chromium browsers
 
 Open the browser's extensions page, turn on developer mode and use **Load unpacked** with the same folder.
+
+### Firefox and Zen (and other Firefox-based browsers)
+
+Needs Firefox 128 or newer (the same is true for the version Zen is built from). Install manually for now while the listing on [addons.mozilla.org](https://addons.mozilla.org/) is prepared:
+
+1. Go to the [latest release](https://github.com/PokeSurvivorPlus/PokeSurvivorPlus/releases/latest) and, under **Assets**, download **`pokesurvivor-plus-1.5.1.xpi`**.
+2. In Firefox or Zen, go to `about:debugging`.
+3. Click **This Firefox** (or **This Thunderbird** → **This Firefox**; in Zen it is the same page).
+4. Click **Load Temporary Add-on** and choose the downloaded **`.xpi`**.
+5. Open (or reload) [pokesurvivor.com](https://pokesurvivor.com/) and see [After installing](#after-installing).
+
+A temporary add-on is removed when the browser closes; load it again on your next session, or wait for the signed listing on addons.mozilla.org, which installs permanently. Until then, everything works the same while the browser is open.
 
 ## After installing
 

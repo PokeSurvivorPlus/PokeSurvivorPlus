@@ -2,6 +2,13 @@
 
 All notable changes to PokeSurvivor Plus, newest first. This is the same history as the **What's new → PokeSurvivor Plus** tab inside the extension.
 
+## 1.5.1 — 20 October 2026
+
+### Added
+
+- Firefox support: PokeSurvivor Plus now installs and runs in Firefox and in browsers built on it, like Zen, from the same extension with the same features (the tier list included). Needs Firefox 128 or newer.
+- The release now ships the extension also as a Firefox `.xpi`, next to the Chrome `.zip`, built from the same files.
+
 ## 1.5.0 — 19 October 2026
 
 ### Added

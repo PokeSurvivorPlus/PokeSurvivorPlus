@@ -1,14 +1,24 @@
 {
   "manifest_version": 3,
   "name": "PokeSurvivor Plus",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "PokeSurvivor Plus: redesigned HUD, damage meter, minimap, controller support, alerts, quality-of-life tools and more!",
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "scripts": ["background.js"]
   },
   "host_permissions": [
     "https://survivortiers.pages.dev/*"
   ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "pokesurvivor-plus@pokesurvivor.com",
+      "strict_min_version": "128.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
   "content_scripts": [
     {
       "matches": [
